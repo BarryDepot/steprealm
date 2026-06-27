@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "StepRealm",
+    "slug": "steprealm",
+    "scheme": "steprealm",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#1a1410",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.barrymalley.steprealm",
+      "infoPlist": {
+        "NSMotionUsageDescription": "StepRealm converts the steps you walk into in-game skill progress."
+      }
+    },
+    "android": {
+      "package": "com.barrymalley.steprealm",
+      "permissions": [
+        "ACTIVITY_RECOGNITION"
+      ]
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
