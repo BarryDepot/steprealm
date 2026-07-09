@@ -1,0 +1,203 @@
+# StepRealm
+
+A walking-driven fantasy RPG, inspired by the WalkScape activity model.
+Pick an activity, walk in real life, your character does the work.
+
+Two parts: an Expo mobile app and a Node/Express API backed by PostgreSQL.
+The server owns the game rules — the phone reports how many steps were walked,
+the server decides what they earned.
+
+---
+
+## Quick start
+
+Developed on **Windows** with an **iPhone** running Expo Go. Notes for
+macOS/Linux are marked where the commands differ.
+
+### One-off: install PostgreSQL
+
+Download the installer from https://www.postgresql.org/download/windows/ and
+run it. It asks for a password for the `postgres` superuser — remember it, you
+need it in the next step. Leave the port as 5432.
+
+You do **not** need to create a database or use pgAdmin; the setup script does
+that for you.
+
+### Every session: two terminals
+
+**Terminal 1 — the API**
+
+```
+cd server
+copy .env.example .env
+```
+
+Open `server\.env` and put your postgres password in:
+
+```
+DATABASE_URL=postgresql://postgres:YOUR_PASSWORD@localhost:5432/steprealm
+```
+
+Then:
+
+```
+npm install
+npm run db:setup
+npm start
+```
+
+`db:setup` creates the database and its tables and prints what it made.
+`npm start` should print `StepRealm API listening on :3000`.
+
+> **Windows Firewall will pop up the first time.** Tick **Private networks**
+> and allow it. If you dismiss it, your phone cannot reach the server and the
+> app shows an Offline banner.
+
+Check it works:
+
+```
+curl http://localhost:3000/health
+```
+
+Expect `{"ok":true,"db":"up"}`.
+
+**Terminal 2 — the app**
+
+Find your laptop's address on the Wi-Fi network:
+
+```
+ipconfig
+```
+
+Look for your Wi-Fi adapter's **IPv4 Address** — something like `192.168.1.20`.
+(macOS: `ipconfig getifaddr en0`.)
+
+```
+copy .env.example .env
+```
+
+Open `.env` in the project root and set that address:
+
+```
+EXPO_PUBLIC_API_URL=http://192.168.1.20:3000
+```
+
+Not `localhost` — on your phone, `localhost` means the phone.
+
+```
+npm install
+npx expo start
+```
+
+Scan the QR code with the iOS **Camera** app.
+
+> **Adding Expo packages later?** Always use `npx expo install <package>`, never
+> `npm install <package>`. `npm install` fetches the newest release, which is
+> built for the newest SDK — installing an SDK 57 package into this SDK 54
+> project makes the native module fail to resolve and the app crashes at import
+> with an error like `Cannot read property 'GRANTED' of undefined`.
+> `npx expo install --check` audits existing versions against the SDK.
+
+Both devices must be on the same Wi-Fi. If you change `.env`, restart
+`expo start` — those values are baked in at bundle time.
+
+---
+
+## What's working
+
+- Three skills (Woodcutting, Mining, Smithing), each with XP and levelling
+- Four starter activities across the Disenchanted Forest
+- Step-cost activity loop: walking N steps funds whole actions, and leftover
+  steps stay banked for the next one
+- Tools with work-efficiency multipliers that reduce per-action step cost
+- Crafting at the forge — the only source of Smithing XP
+- Treasure-box loot rolls (~1 in 200 per action), three rarity tiers
+- **Real step input** from the device pedometer (iOS Core Motion)
+- **Offline progression** — close the app, walk, reopen, and the steps you took
+  while away are credited
+- Server-side persistence in PostgreSQL, with a step ledger and event log
+- Offline tolerance — step batches that can't reach the server are queued on
+  the device and replayed in order
+
+## Testing
+
+```bash
+cd server
+npm test          # 48 tests: 30 unit on the game rules, 18 integration
+npm run typecheck
+```
+
+The integration tests need `DATABASE_URL` set and the schema applied. They
+create their own players and don't touch existing rows.
+
+---
+
+## Layout
+
+```
+app/                    expo-router screens
+  _layout.tsx           root stack + theming
+  index.tsx             home — skills, activities, sync status
+  activity.tsx          live activity screen
+  inventory.tsx         resources + tools, tap to equip
+  forge.tsx             crafting
+
+src/
+  types.ts              core game types
+  api/client.ts         typed API client
+  health/usePedometer.ts  Core Motion step reading + resume catch-up
+  state/gameStore.ts    zustand store, server-synced, AsyncStorage cache
+  content/starterRegion.ts   activities, items, recipes (display copy)
+  game/                 xp / tick / loot — used client-side for display only
+  ui/styles.ts          shared styles + palette
+
+server/
+  db/schema.sql         PostgreSQL schema
+  src/
+    app.ts              express app
+    index.ts            process entry point
+    db.ts               connection pool + transaction helper
+    content.ts          authoritative game content
+    game/               xp / tick / loot / engine — the real rules
+    repo/players.ts     data access
+    routes/players.ts   REST endpoints
+    middleware/errors.ts
+  test/                 unit + integration suites
+```
+
+## API
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Liveness + database check |
+| `GET` | `/api/content` | Skills, activities and recipes |
+| `POST` | `/api/players` | Create a character |
+| `GET` | `/api/players/:id` | Full current state |
+| `POST` | `/api/players/:id/steps` | Report walked steps; server awards progress |
+| `POST` | `/api/players/:id/activity` | Start an activity |
+| `DELETE` | `/api/players/:id/activity` | Stop the running activity |
+| `POST` | `/api/players/:id/equip` | Equip an owned tool |
+| `POST` | `/api/players/:id/craft` | Craft a recipe |
+
+---
+
+## Known limitations
+
+- **No authentication.** A player is identified by a UUID stored on the device;
+  anyone holding it can act as that player.
+- **iOS only.** Step reading uses Core Motion. See `MIGRATION.md` for why this
+  replaced Android Health Connect and how the Android path would be restored.
+- **`src/game/` is duplicated** between client and server. The client copy is
+  used only to render step costs and XP bars before the server responds; the
+  server copy is authoritative. `GET /api/content` exists to remove this
+  duplication but the client does not consume it yet.
+- **Crafting requires an active activity**, since recipes spend banked steps and
+  steps are only banked against a running activity.
+- **Simulator has no pedometer.** `Pedometer.isAvailableAsync()` returns false
+  and the home screen falls back to manual step buttons. The offline mechanic
+  only demonstrates on a physical device.
+
+## Documents
+
+- `SETUP.md` — fuller setup, deployment, and troubleshooting
+- `MIGRATION.md` — requirements migration from the approved proposal
