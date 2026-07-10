@@ -11,7 +11,11 @@ import type { Player } from '../types';
 // http://192.168.1.20:3000) or the deployed URL.
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
-const TIMEOUT_MS = 10_000;
+// Generous because free hosting tiers sleep when idle. Render spins a dormant
+// service back up on the first request, which can take the best part of a
+// minute; a short timeout aborts the call before the server has finished
+// waking, and the app looks broken when it is merely cold.
+const TIMEOUT_MS = 45_000;
 
 export interface GameEvent {
   kind: 'activity' | 'loot' | 'level' | 'system';
