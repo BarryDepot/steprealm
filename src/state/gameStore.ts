@@ -108,10 +108,33 @@ export const useGameStore = create<GameState>()(
 
         bootstrap: async (name = 'Wanderer') => {
           const existing = get().playerId;
+          set({ busy: true });
           try {
-            const res = existing
-              ? await api.getPlayer(existing)
-              : await api.createPlayer(name);
+            // Retry a few times before giving up. A sleeping free-tier service
+            // can refuse or stall the first request while it wakes, and a
+            // single failure used to leave the app permanently unusable until
+            // it was force-quit.
+            let res: StateResponse | null = null;
+            let lastErr: unknown = null;
+
+            for (let attempt = 0; attempt < 3; attempt++) {
+              try {
+                res = existing
+                  ? await api.getPlayer(existing)
+                  : await api.createPlayer(name);
+                break;
+              } catch (err) {
+                lastErr = err;
+                // Only connectivity failures are worth repeating; a 404 or a
+                // rejected request will fail identically every time.
+                if (!(err instanceof OfflineError)) throw err;
+                if (attempt < 2) {
+                  await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                }
+              }
+            }
+
+            if (!res) throw lastErr;
             apply(res);
           } catch (err) {
             if (err instanceof ApiError && err.status === 404) {
@@ -130,7 +153,7 @@ export const useGameStore = create<GameState>()(
               set({ error: 'Could not load your character.' });
             }
           } finally {
-            set({ ready: true });
+            set({ ready: true, busy: false });
           }
         },
 
