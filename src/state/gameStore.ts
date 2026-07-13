@@ -75,6 +75,18 @@ export const useGameStore = create<GameState>()(
         });
       };
 
+      // Guard for actions that need a player. Returning silently here was a
+      // bug: taps did nothing, with no error and no explanation, whenever
+      // bootstrap had failed.
+      const requirePlayer = (): string | null => {
+        const id = get().playerId;
+        if (!id) {
+          set({ error: 'Not connected to the server yet — tap the banner to retry.' });
+          return null;
+        }
+        return id;
+      };
+
       // Shared wrapper for every mutating call. Rule violations surface to the
       // user; connectivity failures flip the offline flag instead, because the
       // player has done nothing wrong and the action can be retried.
@@ -205,27 +217,27 @@ export const useGameStore = create<GameState>()(
         },
 
         startActivity: (activityId) => {
-          const id = get().playerId;
+          const id = requirePlayer();
           return id ? call(() => api.startActivity(id, activityId)) : Promise.resolve();
         },
 
         stopActivity: () => {
-          const id = get().playerId;
+          const id = requirePlayer();
           return id ? call(() => api.stopActivity(id)) : Promise.resolve();
         },
 
         equipTool: (itemId) => {
-          const id = get().playerId;
+          const id = requirePlayer();
           return id ? call(() => api.equipTool(id, itemId)) : Promise.resolve();
         },
 
         craft: (recipeId) => {
-          const id = get().playerId;
+          const id = requirePlayer();
           return id ? call(() => api.craft(id, recipeId)) : Promise.resolve();
         },
 
         refresh: () => {
-          const id = get().playerId;
+          const id = requirePlayer();
           return id ? call(() => api.getPlayer(id)) : Promise.resolve();
         },
 
