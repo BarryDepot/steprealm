@@ -14,7 +14,7 @@ import {
   recentEvents, recordStepBatch, savePlayer,
 } from '../repo/players';
 import {
-  craft, equipTool, ingestSteps, startActivity, stopActivity,
+  claimQuest, craft, equipTool, ingestSteps, startActivity, stopActivity,
 } from '../game/engine';
 import { activities, recipes, skills } from '../content';
 import type { Player } from '../types';
@@ -135,6 +135,20 @@ router.post('/players/:id/activity', wrap(async (req, res) => {
     return result.player;
   });
 
+  await respondWithState(res, playerId, player);
+}));
+
+// Collect a finished quest. Registered before the bare /activity routes only
+// for readability — Express matches on the full path, so the order of these
+// two is not load-bearing.
+router.post('/players/:id/activity/claim', wrap(async (req, res) => {
+  const playerId = playerIdOf(req);
+  const player = await withTransaction(async db => {
+    const result = claimQuest(await loadPlayer(db, playerId));
+    await savePlayer(db, playerId, result.player);
+    await appendEvents(db, playerId, result.events);
+    return result.player;
+  });
   await respondWithState(res, playerId, player);
 }));
 

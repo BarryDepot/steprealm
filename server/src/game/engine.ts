@@ -75,11 +75,16 @@ const pretty = (id: string) => itemById(id)?.name ?? id.replace(/_/g, ' ');
 // --- step ingestion --------------------------------------------------------
 
 /**
- * Spend a batch of walked steps against the player's running activity.
+ * Spend a batch of walked steps against the player's running quest.
+ *
+ * Nothing is granted here — completed actions only advance a counter, and the
+ * rewards they represent are handed over by claimQuest once the quest is
+ * finished. This is what makes a quest feel like a quest rather than a trickle
+ * of loot, and it keeps the reward calculation in exactly one place.
  *
  * Leftover steps that were not enough to fund a whole action stay banked on
- * the activity, which is what allows progression to accumulate across many
- * small sync batches rather than being rounded away each time.
+ * the quest, which is what allows progression to accumulate across many small
+ * sync batches rather than being rounded away each time.
  */
 export function ingestSteps(player: Player, freshSteps: number): EngineResult {
   const events: GameEvent[] = [];
@@ -101,43 +106,95 @@ export function ingestSteps(player: Player, freshSteps: number): EngineResult {
     return { player: next, events, actions: 0, stepsConsumed: 0 };
   }
 
+  const act = activityById(next.current.activityId);
+  const wasComplete = act ? next.current.actionsCompleted >= act.targetActions : false;
+  const actionsCompleted = next.current.actionsCompleted + tick.actions;
+
   next = {
     ...next,
-    current: { ...next.current!, stepsBanked: tick.stepsBankedAfter },
+    current: {
+      ...next.current,
+      stepsBanked: tick.stepsBankedAfter,
+      // Every step walked while this quest is running counts here, even the
+      // ones left over in stepsBanked — this is "effort put in", not "steps
+      // still owed to the next action".
+      totalSteps: next.current.totalSteps + freshSteps,
+      actionsCompleted,
+    },
   };
-
-  for (const y of tick.yieldedItems) {
-    next = addToInventory(next, y.item, y.count);
-  }
-
-  const act = activityById(next.current!.activityId);
-
-  for (const [skill, gained] of Object.entries(tick.xpGained)) {
-    if (!gained) continue;
-    const res = applyXp(next, skill as SkillId, gained);
-    next = res.player;
-    if (res.levelledTo !== null) {
-      events.push({ kind: 'level', message: `${skill} is now level ${res.levelledTo}` });
-    }
-  }
 
   if (tick.actions > 0 && act) {
     events.push({
       kind: 'activity',
-      message: `+${tick.actions} ${pretty(act.yieldItem)} (${tick.stepsConsumed} steps)`,
+      message: `${act.name}: ${actionsCompleted}/${act.targetActions} (${tick.stepsConsumed} steps)`,
     });
 
-    // One loot roll per completed action.
-    for (let i = 0; i < tick.actions; i++) {
-      const drop = rollLoot(act.skill);
-      if (drop.dropped && drop.item) {
-        next = addToInventory(next, drop.item, 1);
-        events.push({ kind: 'loot', message: `Chest! Found ${drop.rarity} ${pretty(drop.item)}` });
-      }
+    // Announced once, on the tick that finishes the quest — the guard stops a
+    // later sync re-announcing a quest that is merely sitting uncollected.
+    if (!wasComplete && actionsCompleted >= act.targetActions) {
+      events.push({
+        kind: 'system',
+        message: `${act.name} complete — ready to collect.`,
+      });
     }
   }
 
   return { player: next, events, actions: tick.actions, stepsConsumed: tick.stepsConsumed };
+}
+
+/**
+ * Collect a finished quest: grant everything it accumulated, then clear it.
+ *
+ * The rewards are recomputed from the action count and the activity definition
+ * rather than read from a stored list, so there is no pending-reward state that
+ * could drift out of step with the counter that produced it.
+ */
+export function claimQuest(player: Player): EngineResult {
+  if (!player.current) {
+    throw new GameRuleError('No quest to collect.');
+  }
+
+  const act = activityById(player.current.activityId);
+  if (!act) {
+    throw new GameRuleError(`Unknown activity: ${player.current.activityId}`);
+  }
+
+  const actions = player.current.actionsCompleted;
+  if (actions < act.targetActions) {
+    throw new GameRuleError(
+      `${act.name} is ${actions}/${act.targetActions} complete — keep walking.`);
+  }
+
+  const events: GameEvent[] = [];
+  let next = addToInventory(player, act.yieldItem, actions);
+
+  events.push({
+    kind: 'activity',
+    message: `Collected ${actions}x ${pretty(act.yieldItem)} from ${act.name}`,
+  });
+
+  // One loot roll per completed action, same rate as before — the rolls simply
+  // happen at collection rather than as each action lands.
+  for (let i = 0; i < actions; i++) {
+    const drop = rollLoot(act.skill);
+    if (drop.dropped && drop.item) {
+      next = addToInventory(next, drop.item, 1);
+      events.push({ kind: 'loot', message: `Chest! Found ${drop.rarity} ${pretty(drop.item)}` });
+    }
+  }
+
+  const res = applyXp(next, act.skill, act.xpReward * actions);
+  next = res.player;
+  if (res.levelledTo !== null) {
+    events.push({ kind: 'level', message: `${act.skill} is now level ${res.levelledTo}` });
+  }
+
+  // Clearing the quest also discards any steps still banked against it. That
+  // is the same thing stopActivity has always done, and it keeps "a quest" a
+  // single self-contained unit rather than a rolling step balance.
+  next = { ...next, current: null };
+
+  return { player: next, events, actions, stepsConsumed: 0 };
 }
 
 // --- activity control ------------------------------------------------------
@@ -154,9 +211,15 @@ export function startActivity(player: Player, activityId: string): EngineResult 
   return {
     player: {
       ...player,
-      current: { activityId, stepsBanked: 0, startedAt: Date.now() },
+      current: {
+        activityId, stepsBanked: 0, totalSteps: 0, actionsCompleted: 0,
+        startedAt: Date.now(),
+      },
     },
-    events: [{ kind: 'system', message: `Started: ${act.name}` }],
+    events: [{
+      kind: 'system',
+      message: `Started: ${act.name} (${act.targetActions} to collect)`,
+    }],
     actions: 0,
     stepsConsumed: 0,
   };

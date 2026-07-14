@@ -28,10 +28,11 @@ export interface Activity {
   id: string;
   name: string;
   skill: SkillId;
-  stepCost: number;     // base steps per action, tools reduce this
+  stepCost: number;      // base steps per action, tools reduce this
   xpReward: number;
-  yieldItem: ItemId;    // what you get per completed action
-  minLevel: number;     // skill level required
+  yieldItem: ItemId;     // what you get per completed action
+  minLevel: number;      // skill level required
+  targetActions: number; // actions needed before the quest can be collected
 }
 
 // Crafting recipe (consumed at the forge / workshop).
@@ -57,11 +58,18 @@ export interface InventoryEntry {
   count: number;
 }
 
-// The current running activity, if any. Null when player is idle.
+// The quest currently running, if any. Null when player is idle.
+//
+// Rewards are not granted as actions complete — they accumulate here and are
+// handed over in one go when the quest is collected. Only the action count is
+// stored, because the rewards it implies are derivable from the activity
+// definition.
 export interface CurrentActivity {
   activityId: string;
-  stepsBanked: number; // accumulated steps not yet spent on a tick
-  startedAt: number;   // unix ms
+  stepsBanked: number;      // accumulated steps not yet spent on an action
+  totalSteps: number;       // cumulative steps walked into this quest since it started
+  actionsCompleted: number; // counts up to the activity's targetActions
+  startedAt: number;        // unix ms
 }
 
 export interface Player {

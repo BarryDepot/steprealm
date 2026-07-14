@@ -1,15 +1,17 @@
-// Activity tick logic. Given an amount of newly-walked steps, how many actions
-// did the player complete, what items did they gain, what XP did they earn?
+// Activity tick logic. Given an amount of newly-walked steps, how many quest
+// actions did the player complete?
+//
+// Rewards are deliberately absent here. Under the quest model an action only
+// advances a counter; what that counter is worth is decided at collection
+// time, in the engine's claimQuest.
 //
 // This is pure - no state mutation. The store calls it and applies the result.
 
 import { activityById, itemById } from '../content';
-import type { Activity, ItemId, Player, SkillId } from '../types';
+import type { Activity, Player } from '../types';
 
 export interface TickResult {
   actions: number;          // how many discrete actions completed
-  yieldedItems: Array<{ item: ItemId; count: number }>;
-  xpGained: Partial<Record<SkillId, number>>;
   stepsConsumed: number;
   stepsBankedAfter: number; // leftover steps not enough for another action
 }
@@ -28,6 +30,10 @@ export function effectiveStepCost(activity: Activity, player: Player): number {
 // Returns an unapplied TickResult. The caller decides whether to apply or
 // discard (we'll always apply, but separating compute from mutation makes
 // the logic easy to unit-test).
+//
+// Actions are capped at the quest's remaining count, and steps are only
+// consumed for actions actually credited — so once a quest is finished,
+// further walking banks steps rather than being silently burned.
 export function computeTick(player: Player, freshSteps: number): TickResult | null {
   if (!player.current) return null;
   const act = activityById(player.current.activityId);
@@ -35,26 +41,18 @@ export function computeTick(player: Player, freshSteps: number): TickResult | nu
 
   const cost = effectiveStepCost(act, player);
   const totalBank = player.current.stepsBanked + freshSteps;
+  const remaining = Math.max(0, act.targetActions - player.current.actionsCompleted);
 
-  const actions = Math.floor(totalBank / cost);
+  const actions = Math.min(Math.floor(totalBank / cost), remaining);
   if (actions <= 0) {
-    return {
-      actions: 0,
-      yieldedItems: [],
-      xpGained: {},
-      stepsConsumed: 0,
-      stepsBankedAfter: totalBank,
-    };
+    return { actions: 0, stepsConsumed: 0, stepsBankedAfter: totalBank };
   }
 
   const stepsConsumed = actions * cost;
-  const stepsBankedAfter = totalBank - stepsConsumed;
 
   return {
     actions,
-    yieldedItems: [{ item: act.yieldItem, count: actions }],
-    xpGained: { [act.skill]: act.xpReward * actions },
     stepsConsumed,
-    stepsBankedAfter,
+    stepsBankedAfter: totalBank - stepsConsumed,
   };
 }

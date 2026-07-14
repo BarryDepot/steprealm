@@ -57,13 +57,21 @@ CREATE TABLE player_equipment (
 );
 
 -- ---------------------------------------------------------------------------
--- The activity currently running. A player may have at most one, which the
+-- The quest currently running. A player may have at most one, which the
 -- primary key on player_id enforces at the database level.
 -- ---------------------------------------------------------------------------
 CREATE TABLE player_activity (
   player_id    UUID        PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
   activity_id  TEXT        NOT NULL,
   steps_banked INTEGER     NOT NULL DEFAULT 0 CHECK (steps_banked >= 0),
+  -- Cumulative steps walked into this quest since it started, so the UI can
+  -- show total contribution rather than just the remainder to the next
+  -- action. Reset to 0 whenever a new quest starts.
+  total_steps  INTEGER     NOT NULL DEFAULT 0 CHECK (total_steps >= 0),
+  -- Actions banked towards the activity's targetActions. The rewards this
+  -- implies are derived from the activity definition at collection time, so
+  -- no pending-reward list is stored.
+  actions_completed INTEGER NOT NULL DEFAULT 0 CHECK (actions_completed >= 0),
   started_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

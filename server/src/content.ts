@@ -38,13 +38,13 @@ export const items: ItemDef[] = [
 export const activities: Activity[] = [
   // Disenchanted Forest - the starter region
   { id: 'chop_birch',   name: 'Chop Birch Tree', skill: 'woodcutting',
-    stepCost: 25, xpReward: 8,  yieldItem: 'birch_log',  minLevel: 1 },
+    stepCost: 50, xpReward: 8,  yieldItem: 'birch_log',  minLevel: 1, targetActions: 5 },
   { id: 'chop_oak',     name: 'Chop Oak Tree',   skill: 'woodcutting',
-    stepCost: 40, xpReward: 18, yieldItem: 'oak_log',    minLevel: 5 },
+    stepCost: 40, xpReward: 18, yieldItem: 'oak_log',    minLevel: 5, targetActions: 5 },
   { id: 'mine_copper',  name: 'Mine Copper Vein', skill: 'mining',
-    stepCost: 30, xpReward: 10, yieldItem: 'copper_ore', minLevel: 1 },
+    stepCost: 30, xpReward: 10, yieldItem: 'copper_ore', minLevel: 1, targetActions: 5 },
   { id: 'mine_iron',    name: 'Mine Iron Vein',   skill: 'mining',
-    stepCost: 50, xpReward: 22, yieldItem: 'iron_ore',   minLevel: 8 },
+    stepCost: 50, xpReward: 22, yieldItem: 'iron_ore',   minLevel: 8, targetActions: 5 },
 ];
 
 export const recipes: Recipe[] = [
