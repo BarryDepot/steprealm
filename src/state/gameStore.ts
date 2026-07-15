@@ -44,6 +44,14 @@ interface GameState {
   /** Steps the device reported that the server has not accepted yet. */
   pending: PendingBatch[];
 
+  /**
+   * Steps the pedometer has seen since the last flush, not yet confirmed by
+   * the server. Purely for optimistic display — e.g. so the activity progress
+   * bar moves as the user walks rather than only on sync — never used to
+   * decide rewards.
+   */
+  unsyncedSteps: number;
+
   ready: boolean;
   busy: boolean;
   offline: boolean;
@@ -53,10 +61,12 @@ interface GameState {
   reportSteps: (steps: number, windowStart: Date, windowEnd: Date) => Promise<void>;
   startActivity: (activityId: string) => Promise<void>;
   stopActivity: () => Promise<void>;
+  claimQuest: () => Promise<void>;
   equipTool: (itemId: ItemId) => Promise<void>;
   craft: (recipeId: string) => Promise<void>;
   refresh: () => Promise<void>;
   clearError: () => void;
+  setUnsyncedSteps: (steps: number) => void;
   reset: () => void;
 }
 
@@ -113,6 +123,7 @@ export const useGameStore = create<GameState>()(
         log: [],
         lastSyncAt: null,
         pending: [],
+        unsyncedSteps: 0,
         ready: false,
         busy: false,
         offline: false,
@@ -226,6 +237,11 @@ export const useGameStore = create<GameState>()(
           return id ? call(() => api.stopActivity(id)) : Promise.resolve();
         },
 
+        claimQuest: () => {
+          const id = requirePlayer();
+          return id ? call(() => api.claimQuest(id)) : Promise.resolve();
+        },
+
         equipTool: (itemId) => {
           const id = requirePlayer();
           return id ? call(() => api.equipTool(id, itemId)) : Promise.resolve();
@@ -243,9 +259,11 @@ export const useGameStore = create<GameState>()(
 
         clearError: () => set({ error: null }),
 
+        setUnsyncedSteps: (steps) => set({ unsyncedSteps: steps }),
+
         reset: () => set({
           playerId: null, player: initialPlayer, log: [],
-          lastSyncAt: null, pending: [], ready: false, error: null,
+          lastSyncAt: null, pending: [], unsyncedSteps: 0, ready: false, error: null,
         }),
       };
     },

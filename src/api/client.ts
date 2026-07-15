@@ -20,6 +20,7 @@ const TIMEOUT_MS = 45_000;
 export interface GameEvent {
   kind: 'activity' | 'loot' | 'level' | 'system';
   message: string;
+  createdAt: string;
 }
 
 export interface StateResponse {
@@ -113,6 +114,10 @@ export const api = {
 
   stopActivity: (playerId: string) =>
     request<StateResponse>('DELETE', `/api/players/${playerId}/activity`),
+
+  /** Collect a finished quest. Refused with 422 if it is not finished. */
+  claimQuest: (playerId: string) =>
+    request<StateResponse>('POST', `/api/players/${playerId}/activity/claim`),
 
   equipTool: (playerId: string, itemId: string) =>
     request<StateResponse>('POST', `/api/players/${playerId}/equip`, { itemId }),
