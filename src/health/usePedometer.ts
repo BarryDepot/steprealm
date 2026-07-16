@@ -38,7 +38,7 @@ const MAX_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 // How often to send foreground steps to the server. Short enough that progress
 // visibly ticks along while walking, long enough not to hammer the API — and
 // on Render's free tier, not so chatty that it keeps the dyno permanently hot.
-const FLUSH_INTERVAL_MS = 20_000;
+const FLUSH_INTERVAL_MS = 5_000;
 
 // iOS reports a denied motion permission as an error on the read, not through
 // the permission API. The wording is not contractual, so this is best effort.
@@ -50,6 +50,19 @@ function looksLikePermissionError(err: unknown): boolean {
 export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedometerOptions) {
   const [status, setStatus] = useState<PedometerStatus>('checking');
   const [liveSteps, setLiveSteps] = useState(0);
+
+  // Steps walked since the last successful flush, for optimistic display
+  // (e.g. the activity progress bar) that shouldn't wait for a server round
+  // trip. Tracked separately from liveSteps, which is a since-opening total
+  // for the home screen and must keep counting up through a flush rather
+  // than reset with it.
+  const [unsyncedSteps, setUnsyncedSteps] = useState(0);
+  // watchStepCount reports a cumulative count since the subscription began,
+  // not a per-event delta, so this ref is the running total to diff against.
+  const rawStepsRef = useRef(0);
+  // The value of rawStepsRef at the last successful flush — the baseline
+  // unsyncedSteps is measured from.
+  const unsyncedBaselineRef = useRef(0);
 
   // Held in a ref so the AppState listener always sees the current value
   // without needing to be torn down and rebuilt on every sync.
@@ -79,6 +92,11 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
       if (steps > 0) {
         await onSteps(steps, from, now);
       }
+      // Whatever was walked up to "now" has been reported (or queued while
+      // offline — see reportSteps), so the optimistic count restarts from
+      // here rather than double-adding the same steps next tick.
+      unsyncedBaselineRef.current = rawStepsRef.current;
+      setUnsyncedSteps(0);
     } catch (err) {
       // A read failure is not fatal: the high-water mark has not moved, so the
       // same window is retried on the next resume and nothing is lost. But a
@@ -139,7 +157,10 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
     let subscription: { remove: () => void } | undefined;
     try {
       subscription = Pedometer.watchStepCount(result => {
-        setLiveSteps(result?.steps ?? 0);
+        const raw = result?.steps ?? 0;
+        rawStepsRef.current = raw;
+        setLiveSteps(raw);
+        setUnsyncedSteps(Math.max(0, raw - unsyncedBaselineRef.current));
       });
     } catch (err) {
       console.warn('[pedometer] live updates unavailable', err);
@@ -182,5 +203,5 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
     return () => clearInterval(timer);
   }, [status, enabled, catchUp]);
 
-  return { status, liveSteps, catchUp };
+  return { status, liveSteps, unsyncedSteps, catchUp };
 }

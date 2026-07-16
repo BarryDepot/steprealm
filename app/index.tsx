@@ -9,7 +9,7 @@ import { Link, router } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { activities, skills } from '../src/content/starterRegion';
+import { activities, activityById, skills } from '../src/content/starterRegion';
 import { progressInLevel } from '../src/game/xp';
 import { effectiveStepCost } from '../src/game/tick';
 import { useGameStore } from '../src/state/gameStore';
@@ -17,17 +17,19 @@ import { usePedometer } from '../src/health/usePedometer';
 import { palette, styles } from '../src/ui/styles';
 
 export default function Home() {
-  const player        = useGameStore(s => s.player);
-  const ready         = useGameStore(s => s.ready);
-  const busy          = useGameStore(s => s.busy);
-  const offline       = useGameStore(s => s.offline);
-  const error         = useGameStore(s => s.error);
-  const pending       = useGameStore(s => s.pending);
-  const lastSyncAt    = useGameStore(s => s.lastSyncAt);
-  const bootstrap     = useGameStore(s => s.bootstrap);
-  const reportSteps   = useGameStore(s => s.reportSteps);
-  const startActivity = useGameStore(s => s.startActivity);
-  const clearError    = useGameStore(s => s.clearError);
+  const player          = useGameStore(s => s.player);
+  const ready           = useGameStore(s => s.ready);
+  const busy            = useGameStore(s => s.busy);
+  const offline         = useGameStore(s => s.offline);
+  const error           = useGameStore(s => s.error);
+  const pending         = useGameStore(s => s.pending);
+  const lastSyncAt      = useGameStore(s => s.lastSyncAt);
+  const bootstrap       = useGameStore(s => s.bootstrap);
+  const reportSteps     = useGameStore(s => s.reportSteps);
+  const startActivity   = useGameStore(s => s.startActivity);
+  const claimQuest      = useGameStore(s => s.claimQuest);
+  const clearError      = useGameStore(s => s.clearError);
+  const setUnsyncedSteps = useGameStore(s => s.setUnsyncedSteps);
 
   useEffect(() => { void bootstrap(); }, [bootstrap]);
 
@@ -36,16 +38,31 @@ export default function Home() {
     [reportSteps]
   );
 
-  const { status, liveSteps } = usePedometer({
+  const { status, liveSteps, unsyncedSteps } = usePedometer({
     onSteps,
     lastSyncAt: lastSyncAt ? new Date(lastSyncAt) : null,
     enabled: ready,
   });
 
+  // The activity screen doesn't run its own pedometer subscription — this
+  // screen stays mounted underneath it in the stack, so the store is how the
+  // live count reaches whichever screen is on top.
+  useEffect(() => {
+    setUnsyncedSteps(unsyncedSteps);
+  }, [unsyncedSteps, setUnsyncedSteps]);
+
   const begin = async (activityId: string) => {
     await startActivity(activityId);
     if (!useGameStore.getState().error) router.push('/activity');
   };
+
+  // The quest in progress, if any, resolved against the content definitions so
+  // the card can show its target without another server round trip.
+  const activeQuest = player.current
+    ? activityById(player.current.activityId) ?? null
+    : null;
+  const questDone = !!activeQuest
+    && player.current!.actionsCompleted >= activeQuest.targetActions;
 
   if (!ready) {
     return (
@@ -97,6 +114,44 @@ export default function Home() {
         </View>
       )}
 
+      {activeQuest && player.current && (
+        <>
+          <Text style={styles.sectionLabel}>Active quest</Text>
+          <View style={[styles.panel, questDone && { borderColor: palette.good }]}>
+            <View style={styles.rowBetween}>
+              <Text style={styles.text}>{activeQuest.name}</Text>
+              <Text style={styles.textDim}>
+                {player.current.actionsCompleted} / {activeQuest.targetActions}
+              </Text>
+            </View>
+            <View style={{
+              height: 6, backgroundColor: palette.panelEdge, borderRadius: 3,
+              marginTop: 8, overflow: 'hidden',
+            }}>
+              <View style={{
+                width: `${Math.min(100, Math.round(
+                  (player.current.actionsCompleted / activeQuest.targetActions) * 100))}%`,
+                height: '100%',
+                backgroundColor: questDone ? palette.good : palette.accent,
+              }} />
+            </View>
+
+            <Pressable
+              disabled={busy}
+              onPress={() => {
+                if (questDone) void claimQuest();
+                else router.push('/activity');
+              }}
+              style={[styles.button, { marginTop: 12 }, busy && { opacity: 0.5 }]}
+            >
+              <Text style={styles.buttonText}>
+                {questDone ? 'Collect' : 'View quest'}
+              </Text>
+            </Pressable>
+          </View>
+        </>
+      )}
+
       <Text style={styles.sectionLabel}>Skills</Text>
       {skills.map(skill => {
         const prog = player.skills[skill.id];
@@ -119,23 +174,30 @@ export default function Home() {
         );
       })}
 
-      <Text style={styles.sectionLabel}>Activities</Text>
+      <Text style={styles.sectionLabel}>
+        {activeQuest ? 'Quests — finish the active one first' : 'Quests'}
+      </Text>
       {activities.map(act => {
         const cost = effectiveStepCost(act, player);
         const locked = player.skills[act.skill].level < act.minLevel;
+        // Starting a quest replaces the running one, discarding uncollected
+        // progress — so while one is active the rest are held shut rather
+        // than quietly throwing away what the player has walked for.
+        const blocked = locked || busy || !!activeQuest;
         return (
           <Pressable
             key={act.id}
-            disabled={locked || busy}
+            disabled={blocked}
             onPress={() => void begin(act.id)}
-            style={[styles.panel, (locked || busy) && { opacity: 0.5 }]}
+            style={[styles.panel, blocked && { opacity: 0.5 }]}
           >
             <View style={styles.rowBetween}>
               <Text style={styles.text}>{act.name}</Text>
               <Text style={styles.textDim}>{cost} steps</Text>
             </View>
             <Text style={styles.textDim}>
-              {act.skill} · +{act.xpReward} xp{locked ? `  (req lv ${act.minLevel})` : ''}
+              {act.skill} · {act.targetActions} actions · +{act.xpReward} xp each
+              {locked ? `  (req lv ${act.minLevel})` : ''}
             </Text>
           </Pressable>
         );
