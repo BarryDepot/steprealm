@@ -1,2 +1,6 @@
 node_modules/
+
+# Local secrets. The .example templates alongside these are committed so that
+# anyone cloning the repo can see what configuration is required.
 .env
+.env.render
