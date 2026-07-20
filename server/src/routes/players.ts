@@ -111,7 +111,7 @@ router.post('/players/:id/steps', wrap(async (req, res) => {
     const current = await loadPlayer(db, playerId);
     const result = ingestSteps(current, steps);
     await savePlayer(db, playerId, result.player);
-    await recordStepBatch(db, playerId, steps, source, result.actions, windowStart, windowEnd);
+    await recordStepBatch(db, playerId, steps, source, result.questsCompleted, windowStart, windowEnd);
     await appendEvents(db, playerId, result.events);
     return result.player;
   });

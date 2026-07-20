@@ -78,10 +78,9 @@ export async function loadPlayer(db: Db, playerId: string): Promise<Player> {
     db.query<{ skill_id: string; item_id: string }>(
       `SELECT skill_id, item_id FROM player_equipment WHERE player_id = $1`, [playerId]),
     db.query<{
-      activity_id: string; steps_banked: number; total_steps: number;
-      actions_completed: number; started_at: Date;
+      activity_id: string; steps_banked: number; total_steps: number; started_at: Date;
     }>(
-      `SELECT activity_id, steps_banked, total_steps, actions_completed, started_at
+      `SELECT activity_id, steps_banked, total_steps, started_at
        FROM player_activity WHERE player_id = $1`, [playerId]),
   ]);
 
@@ -114,7 +113,6 @@ export async function loadPlayer(db: Db, playerId: string): Promise<Player> {
           activityId: activity.activity_id,
           stepsBanked: activity.steps_banked,
           totalSteps: activity.total_steps,
-          actionsCompleted: activity.actions_completed,
           startedAt: activity.started_at.getTime(),
         }
       : null,
@@ -166,16 +164,15 @@ export async function savePlayer(db: Db, playerId: string, player: Player): Prom
   if (player.current) {
     await db.query(
       `INSERT INTO player_activity
-         (player_id, activity_id, steps_banked, total_steps, actions_completed, started_at)
-       VALUES ($1, $2, $3, $4, $5, to_timestamp($6 / 1000.0))
+         (player_id, activity_id, steps_banked, total_steps, started_at)
+       VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0))
        ON CONFLICT (player_id)
        DO UPDATE SET activity_id = EXCLUDED.activity_id,
                      steps_banked = EXCLUDED.steps_banked,
                      total_steps = EXCLUDED.total_steps,
-                     actions_completed = EXCLUDED.actions_completed,
                      started_at = EXCLUDED.started_at`,
       [playerId, player.current.activityId, player.current.stepsBanked,
-       player.current.totalSteps, player.current.actionsCompleted, player.current.startedAt]
+       player.current.totalSteps, player.current.startedAt]
     );
   } else {
     await db.query(`DELETE FROM player_activity WHERE player_id = $1`, [playerId]);

@@ -63,15 +63,13 @@ CREATE TABLE player_equipment (
 CREATE TABLE player_activity (
   player_id    UUID        PRIMARY KEY REFERENCES players(id) ON DELETE CASCADE,
   activity_id  TEXT        NOT NULL,
+  -- Spendable step pool, drawn down by crafting recipes. Distinct from
+  -- total_steps so a trip to the forge cannot undo quest progress.
   steps_banked INTEGER     NOT NULL DEFAULT 0 CHECK (steps_banked >= 0),
-  -- Cumulative steps walked into this quest since it started, so the UI can
-  -- show total contribution rather than just the remainder to the next
-  -- action. Reset to 0 whenever a new quest starts.
+  -- Progress towards the activity's targetSteps. The reward this earns is
+  -- read from the activity definition at collection time, so no pending
+  -- reward is stored.
   total_steps  INTEGER     NOT NULL DEFAULT 0 CHECK (total_steps >= 0),
-  -- Actions banked towards the activity's targetActions. The rewards this
-  -- implies are derived from the activity definition at collection time, so
-  -- no pending-reward list is stored.
-  actions_completed INTEGER NOT NULL DEFAULT 0 CHECK (actions_completed >= 0),
   started_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -87,6 +85,7 @@ CREATE TABLE step_ledger (
   source       TEXT        NOT NULL CHECK (source IN ('pedometer', 'manual')),
   window_start TIMESTAMPTZ,
   window_end   TIMESTAMPTZ,
+  -- Quests this batch of steps finished (0 or 1).
   actions      INTEGER     NOT NULL DEFAULT 0 CHECK (actions >= 0),
   recorded_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -10,8 +10,9 @@ import { useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { activityById } from '../src/content/starterRegion';
-import { effectiveStepCost } from '../src/game/tick';
+import { effectiveTargetSteps } from '../src/game/tick';
 import { useGameStore } from '../src/state/gameStore';
+import { AnimatedCounter, AnimatedProgressBar } from '../src/ui/AnimatedProgress';
 import { palette, styles } from '../src/ui/styles';
 
 // "2 min ago" style formatting for the event feed. Recomputed on every
@@ -53,22 +54,14 @@ export default function ActivityScreen() {
     );
   }
 
-  const cost      = effectiveStepCost(act, player);
-  const completed = player.current.actionsCompleted;
-  const done      = completed >= act.targetActions;
+  const target = effectiveTargetSteps(act, player);
 
   // The server only learns about steps every flush; adding the pedometer's
   // own count in between makes the bar move as the player walks instead of
-  // sitting still until the next sync. Rewards are still decided entirely by
-  // the server response, this is display only.
-  //
-  // Once the quest is finished no further steps are spent on it, so the
-  // step bar is pinned full rather than creeping towards an action that will
-  // never be credited.
-  const banked           = done ? cost : Math.min(cost, player.current.stepsBanked + unsyncedSteps);
-  const pct              = Math.min(100, Math.round((banked / cost) * 100));
-  const questPct         = Math.min(100, Math.round((completed / act.targetActions) * 100));
-  const totalContributed = player.current.totalSteps + unsyncedSteps;
+  // sitting still until the next sync. The reward is still decided entirely
+  // by the server response — this is display only.
+  const walked = Math.min(target, player.current.totalSteps + unsyncedSteps);
+  const done   = walked >= target;
 
   // Event colour follows its kind, so a chest drop reads differently from a
   // routine yield without needing an icon set.
@@ -81,54 +74,35 @@ export default function ActivityScreen() {
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 32 }}>
       <Text style={styles.title}>{act.name}</Text>
       <Text style={styles.textDim}>
-        {cost} steps per action · +{act.xpReward} {act.skill} xp each
+        Walk {target} steps · {act.yieldCount}x {act.yieldItem.replace(/_/g, ' ')} · +{act.xpReward} {act.skill} xp
       </Text>
 
       <View style={[styles.panel, { marginTop: 18 }, done && { borderColor: palette.good }]}>
         <View style={styles.rowBetween}>
           <Text style={styles.text}>Quest progress</Text>
-          <Text style={styles.textDim}>{completed} / {act.targetActions} actions</Text>
+          <AnimatedCounter
+            value={walked}
+            style={styles.textDim}
+            format={n => `${n} / ${target} steps`}
+          />
         </View>
-        <View style={{
-          height: 8, backgroundColor: palette.panelEdge, borderRadius: 4,
-          marginTop: 8, overflow: 'hidden',
-        }}>
-          <View style={{
-            width: `${questPct}%`, height: '100%',
-            backgroundColor: done ? palette.good : palette.accent,
-          }} />
-        </View>
+        <AnimatedProgressBar
+          progress={walked / target}
+          colour={done ? palette.good : palette.accent}
+        />
         <Text style={[styles.textDim, { marginTop: 8 }]}>
           {done
-            ? `Ready to collect: ${act.targetActions}x ${act.yieldItem.replace(/_/g, ' ')} and ${act.xpReward * act.targetActions} xp.`
-            : 'Rewards are handed over when the quest is finished.'}
+            ? `Ready to collect: ${act.yieldCount}x ${act.yieldItem.replace(/_/g, ' ')} and ${act.xpReward} xp.`
+            : 'Keep walking — the reward is handed over when the quest is finished.'}
         </Text>
       </View>
 
-      {!done && (
-        <View style={[styles.panel, { marginTop: 12 }]}>
-          <View style={styles.rowBetween}>
-            <Text style={styles.text}>Progress to next action</Text>
-            <Text style={styles.textDim}>{banked} / {cost}</Text>
-          </View>
-          <View style={{
-            height: 8, backgroundColor: palette.panelEdge, borderRadius: 4,
-            marginTop: 8, overflow: 'hidden',
-          }}>
-            <View style={{
-              width: `${pct}%`, height: '100%', backgroundColor: palette.accent,
-            }} />
-          </View>
-          <Text style={[styles.textDim, { marginTop: 8 }]}>
-            Keep walking — the bar tracks your steps as you go.
-          </Text>
-        </View>
-      )}
-
       <View style={[styles.panel, { marginTop: 12 }]}>
         <View style={styles.rowBetween}>
-          <Text style={styles.text}>Total steps this activity</Text>
-          <Text style={styles.textDim}>{totalContributed.toLocaleString()}</Text>
+          <Text style={styles.text}>Steps banked for crafting</Text>
+          <Text style={styles.textDim}>
+            {(player.current.stepsBanked + unsyncedSteps).toLocaleString()}
+          </Text>
         </View>
       </View>
 

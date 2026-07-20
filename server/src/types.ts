@@ -24,15 +24,17 @@ export interface ItemDef {
   rarity?: Rarity; // mostly for tools that drop from chests
 }
 
+// A quest: walk targetSteps, then collect a flat reward. There is no
+// per-action subdivision — the step target is the whole of the requirement.
 export interface Activity {
   id: string;
   name: string;
   skill: SkillId;
-  stepCost: number;      // base steps per action, tools reduce this
-  xpReward: number;
-  yieldItem: ItemId;     // what you get per completed action
-  minLevel: number;      // skill level required
-  targetActions: number; // actions needed before the quest can be collected
+  targetSteps: number; // steps to finish the quest; tools reduce this
+  yieldItem: ItemId;   // granted once, on collection
+  yieldCount: number;
+  xpReward: number;    // granted once, on collection
+  minLevel: number;    // skill level required
 }
 
 // Crafting recipe (consumed at the forge / workshop).
@@ -60,16 +62,18 @@ export interface InventoryEntry {
 
 // The quest currently running, if any. Null when player is idle.
 //
-// Rewards are not granted as actions complete — they accumulate here and are
-// handed over in one go when the quest is collected. Only the action count is
-// stored, because the rewards it implies are derivable from the activity
-// definition.
+// Rewards are not granted as the player walks — the quest is collected once
+// totalSteps reaches the activity's (tool-adjusted) targetSteps, and the
+// reward it pays out is read from the activity definition at that point.
+//
+// The two counters are deliberately separate. totalSteps only ever grows and
+// measures progress towards the target; stepsBanked is a spendable pool that
+// crafting draws down, so a trip to the forge cannot undo quest progress.
 export interface CurrentActivity {
   activityId: string;
-  stepsBanked: number;      // accumulated steps not yet spent on an action
-  totalSteps: number;       // cumulative steps walked into this quest since it started
-  actionsCompleted: number; // counts up to the activity's targetActions
-  startedAt: number;        // unix ms
+  stepsBanked: number; // spendable steps, consumed by crafting recipes
+  totalSteps: number;  // progress towards the quest target
+  startedAt: number;   // unix ms
 }
 
 export interface Player {

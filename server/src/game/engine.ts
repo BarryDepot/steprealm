@@ -11,7 +11,7 @@
 // easy to unit-test without a database.
 
 import { activityById, itemById, recipeById } from '../content';
-import { computeTick, effectiveStepCost } from './tick';
+import { computeTick, effectiveTargetSteps } from './tick';
 import { rollLoot } from './loot';
 import { levelFromXp } from './xp';
 import type { ItemId, Player, Recipe, SkillId } from '../types';
@@ -24,7 +24,13 @@ export interface GameEvent {
 export interface EngineResult {
   player: Player;
   events: GameEvent[];
-  actions: number;
+  /**
+   * Quests finished by this call — 0 or 1. Recorded in the step ledger, which
+   * is why it survived the move away from per-action counting: the column
+   * answers "what did this batch of steps achieve", and a completed quest is
+   * now the only thing it can achieve.
+   */
+  questsCompleted: number;
   stepsConsumed: number;
 }
 
@@ -75,63 +81,56 @@ const pretty = (id: string) => itemById(id)?.name ?? id.replace(/_/g, ' ');
 // --- step ingestion --------------------------------------------------------
 
 /**
- * Spend a batch of walked steps against the player's running quest.
+ * Credit a batch of walked steps against the player's running quest.
  *
- * Nothing is granted here — completed actions only advance a counter, and the
- * rewards they represent are handed over by claimQuest once the quest is
- * finished. This is what makes a quest feel like a quest rather than a trickle
+ * Nothing is granted here — steps only advance the quest's progress, and the
+ * reward that progress earns is handed over by claimQuest once the target is
+ * reached. This is what makes a quest feel like a quest rather than a trickle
  * of loot, and it keeps the reward calculation in exactly one place.
- *
- * Leftover steps that were not enough to fund a whole action stay banked on
- * the quest, which is what allows progression to accumulate across many small
- * sync batches rather than being rounded away each time.
  */
 export function ingestSteps(player: Player, freshSteps: number): EngineResult {
   const events: GameEvent[] = [];
 
   if (freshSteps <= 0) {
-    return { player, events, actions: 0, stepsConsumed: 0 };
+    return { player, events, questsCompleted: 0, stepsConsumed: 0 };
   }
 
   let next: Player = { ...player, totalSteps: player.totalSteps + freshSteps };
 
   // Steps still count towards the lifetime total when the player is idle,
-  // they just do not fund any actions.
+  // they just do not advance any quest.
   if (!next.current) {
-    return { player: next, events, actions: 0, stepsConsumed: 0 };
+    return { player: next, events, questsCompleted: 0, stepsConsumed: 0 };
   }
 
   const tick = computeTick(next, freshSteps);
   if (!tick) {
-    return { player: next, events, actions: 0, stepsConsumed: 0 };
+    return { player: next, events, questsCompleted: 0, stepsConsumed: 0 };
   }
 
   const act = activityById(next.current.activityId);
-  const wasComplete = act ? next.current.actionsCompleted >= act.targetActions : false;
-  const actionsCompleted = next.current.actionsCompleted + tick.actions;
+  const wasComplete = next.current.totalSteps >= tick.targetSteps;
 
   next = {
     ...next,
     current: {
       ...next.current,
-      stepsBanked: tick.stepsBankedAfter,
-      // Every step walked while this quest is running counts here, even the
-      // ones left over in stepsBanked — this is "effort put in", not "steps
-      // still owed to the next action".
-      totalSteps: next.current.totalSteps + freshSteps,
-      actionsCompleted,
+      // Banked steps are the crafting pool and are never spent by walking,
+      // so every step lands in both counters.
+      stepsBanked: next.current.stepsBanked + freshSteps,
+      totalSteps: tick.stepsTowardsTarget,
     },
   };
 
-  if (tick.actions > 0 && act) {
+  if (act) {
     events.push({
       kind: 'activity',
-      message: `${act.name}: ${actionsCompleted}/${act.targetActions} (${tick.stepsConsumed} steps)`,
+      message: `${act.name}: ${Math.min(tick.stepsTowardsTarget, tick.targetSteps)}/${tick.targetSteps} steps`,
     });
 
     // Announced once, on the tick that finishes the quest — the guard stops a
     // later sync re-announcing a quest that is merely sitting uncollected.
-    if (!wasComplete && actionsCompleted >= act.targetActions) {
+    if (!wasComplete && tick.complete) {
       events.push({
         kind: 'system',
         message: `${act.name} complete — ready to collect.`,
@@ -139,15 +138,20 @@ export function ingestSteps(player: Player, freshSteps: number): EngineResult {
     }
   }
 
-  return { player: next, events, actions: tick.actions, stepsConsumed: tick.stepsConsumed };
+  return {
+    player: next,
+    events,
+    questsCompleted: !wasComplete && tick.complete ? 1 : 0,
+    stepsConsumed: freshSteps,
+  };
 }
 
 /**
- * Collect a finished quest: grant everything it accumulated, then clear it.
+ * Collect a finished quest: grant its flat reward, then clear it.
  *
- * The rewards are recomputed from the action count and the activity definition
- * rather than read from a stored list, so there is no pending-reward state that
- * could drift out of step with the counter that produced it.
+ * The reward is read from the activity definition rather than from stored
+ * state, so there is no pending-reward record that could drift out of step
+ * with the progress that earned it.
  */
 export function claimQuest(player: Player): EngineResult {
   if (!player.current) {
@@ -159,31 +163,32 @@ export function claimQuest(player: Player): EngineResult {
     throw new GameRuleError(`Unknown activity: ${player.current.activityId}`);
   }
 
-  const actions = player.current.actionsCompleted;
-  if (actions < act.targetActions) {
+  const targetSteps = effectiveTargetSteps(act, player);
+  const walked = player.current.totalSteps;
+  if (walked < targetSteps) {
     throw new GameRuleError(
-      `${act.name} is ${actions}/${act.targetActions} complete — keep walking.`);
+      `${act.name} is ${walked}/${targetSteps} steps complete — keep walking.`);
   }
 
   const events: GameEvent[] = [];
-  let next = addToInventory(player, act.yieldItem, actions);
+  let next = addToInventory(player, act.yieldItem, act.yieldCount);
 
   events.push({
     kind: 'activity',
-    message: `Collected ${actions}x ${pretty(act.yieldItem)} from ${act.name}`,
+    message: `Collected ${act.yieldCount}x ${pretty(act.yieldItem)} from ${act.name}`,
   });
 
-  // One loot roll per completed action, same rate as before — the rolls simply
-  // happen at collection rather than as each action lands.
-  for (let i = 0; i < actions; i++) {
-    const drop = rollLoot(act.skill);
-    if (drop.dropped && drop.item) {
-      next = addToInventory(next, drop.item, 1);
-      events.push({ kind: 'loot', message: `Chest! Found ${drop.rarity} ${pretty(drop.item)}` });
-    }
+  // One roll per completed quest. The old model rolled once per action, so at
+  // five actions a quest this is a fifth of the previous chance per quest —
+  // but a quest is also a much shorter walk now, so the rate per step is
+  // broadly unchanged.
+  const drop = rollLoot(act.skill);
+  if (drop.dropped && drop.item) {
+    next = addToInventory(next, drop.item, 1);
+    events.push({ kind: 'loot', message: `Chest! Found ${drop.rarity} ${pretty(drop.item)}` });
   }
 
-  const res = applyXp(next, act.skill, act.xpReward * actions);
+  const res = applyXp(next, act.skill, act.xpReward);
   next = res.player;
   if (res.levelledTo !== null) {
     events.push({ kind: 'level', message: `${act.skill} is now level ${res.levelledTo}` });
@@ -194,7 +199,7 @@ export function claimQuest(player: Player): EngineResult {
   // single self-contained unit rather than a rolling step balance.
   next = { ...next, current: null };
 
-  return { player: next, events, actions, stepsConsumed: 0 };
+  return { player: next, events, questsCompleted: 1, stepsConsumed: 0 };
 }
 
 // --- activity control ------------------------------------------------------
@@ -212,15 +217,14 @@ export function startActivity(player: Player, activityId: string): EngineResult 
     player: {
       ...player,
       current: {
-        activityId, stepsBanked: 0, totalSteps: 0, actionsCompleted: 0,
-        startedAt: Date.now(),
+        activityId, stepsBanked: 0, totalSteps: 0, startedAt: Date.now(),
       },
     },
     events: [{
       kind: 'system',
-      message: `Started: ${act.name} (${act.targetActions} to collect)`,
+      message: `Started: ${act.name} (${effectiveTargetSteps(act, player)} steps to collect)`,
     }],
-    actions: 0,
+    questsCompleted: 0,
     stepsConsumed: 0,
   };
 }
@@ -229,7 +233,7 @@ export function stopActivity(player: Player): EngineResult {
   return {
     player: { ...player, current: null },
     events: [{ kind: 'system', message: 'Activity stopped.' }],
-    actions: 0,
+    questsCompleted: 0,
     stepsConsumed: 0,
   };
 }
@@ -250,7 +254,7 @@ export function equipTool(player: Player, itemId: ItemId): EngineResult {
       equipped: { ...player.equipped, [def.tool.skill]: itemId },
     },
     events: [{ kind: 'system', message: `Equipped ${def.name}.` }],
-    actions: 0,
+    questsCompleted: 0,
     stepsConsumed: 0,
   };
 }
@@ -316,7 +320,7 @@ export function craft(player: Player, recipeId: string): EngineResult {
     events.push({ kind: 'level', message: `${recipe.skill} is now level ${res.levelledTo}` });
   }
 
-  return { player: next, events, actions: 1, stepsConsumed: recipe.stepCost };
+  return { player: next, events, questsCompleted: 0, stepsConsumed: recipe.stepCost };
 }
 
-export { effectiveStepCost };
+export { effectiveTargetSteps };

@@ -11,9 +11,10 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 
 import { activities, activityById, skills } from '../src/content/starterRegion';
 import { progressInLevel } from '../src/game/xp';
-import { effectiveStepCost } from '../src/game/tick';
+import { effectiveTargetSteps } from '../src/game/tick';
 import { useGameStore } from '../src/state/gameStore';
 import { usePedometer } from '../src/health/usePedometer';
+import { AnimatedCounter, AnimatedProgressBar } from '../src/ui/AnimatedProgress';
 import { palette, styles } from '../src/ui/styles';
 
 export default function Home() {
@@ -61,8 +62,11 @@ export default function Home() {
   const activeQuest = player.current
     ? activityById(player.current.activityId) ?? null
     : null;
-  const questDone = !!activeQuest
-    && player.current!.actionsCompleted >= activeQuest.targetActions;
+  const questTarget = activeQuest ? effectiveTargetSteps(activeQuest, player) : 0;
+  const questWalked = activeQuest
+    ? Math.min(questTarget, player.current!.totalSteps + unsyncedSteps)
+    : 0;
+  const questDone = !!activeQuest && questWalked >= questTarget;
 
   if (!ready) {
     return (
@@ -120,21 +124,17 @@ export default function Home() {
           <View style={[styles.panel, questDone && { borderColor: palette.good }]}>
             <View style={styles.rowBetween}>
               <Text style={styles.text}>{activeQuest.name}</Text>
-              <Text style={styles.textDim}>
-                {player.current.actionsCompleted} / {activeQuest.targetActions}
-              </Text>
+              <AnimatedCounter
+                value={questWalked}
+                style={styles.textDim}
+                format={n => `${n} / ${questTarget} steps`}
+              />
             </View>
-            <View style={{
-              height: 6, backgroundColor: palette.panelEdge, borderRadius: 3,
-              marginTop: 8, overflow: 'hidden',
-            }}>
-              <View style={{
-                width: `${Math.min(100, Math.round(
-                  (player.current.actionsCompleted / activeQuest.targetActions) * 100))}%`,
-                height: '100%',
-                backgroundColor: questDone ? palette.good : palette.accent,
-              }} />
-            </View>
+            <AnimatedProgressBar
+              progress={questTarget > 0 ? questWalked / questTarget : 0}
+              height={6}
+              colour={questDone ? palette.good : palette.accent}
+            />
 
             <Pressable
               disabled={busy}
@@ -178,7 +178,7 @@ export default function Home() {
         {activeQuest ? 'Quests — finish the active one first' : 'Quests'}
       </Text>
       {activities.map(act => {
-        const cost = effectiveStepCost(act, player);
+        const target = effectiveTargetSteps(act, player);
         const locked = player.skills[act.skill].level < act.minLevel;
         // Starting a quest replaces the running one, discarding uncollected
         // progress — so while one is active the rest are held shut rather
@@ -193,10 +193,10 @@ export default function Home() {
           >
             <View style={styles.rowBetween}>
               <Text style={styles.text}>{act.name}</Text>
-              <Text style={styles.textDim}>{cost} steps</Text>
+              <Text style={styles.textDim}>{target} steps</Text>
             </View>
             <Text style={styles.textDim}>
-              {act.skill} · {act.targetActions} actions · +{act.xpReward} xp each
+              {act.skill} · {act.yieldCount}x {act.yieldItem.replace(/_/g, ' ')} · +{act.xpReward} xp
               {locked ? `  (req lv ${act.minLevel})` : ''}
             </Text>
           </Pressable>

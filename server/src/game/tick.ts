@@ -1,9 +1,10 @@
-// Activity tick logic. Given an amount of newly-walked steps, how many quest
-// actions did the player complete?
+// Quest tick logic. Given an amount of newly-walked steps, how far along the
+// quest is the player, and is it finished?
 //
-// Rewards are deliberately absent here. Under the quest model an action only
-// advances a counter; what that counter is worth is decided at collection
-// time, in the engine's claimQuest.
+// A quest is a flat step target: there are no discrete actions to divide it
+// into, so this is arithmetic on a running total. Rewards are absent here —
+// what a finished quest pays out is decided at collection time, in the
+// engine's claimQuest.
 //
 // This is pure - no state mutation. The store calls it and applies the result.
 
@@ -11,48 +12,39 @@ import { activityById, itemById } from '../content';
 import type { Activity, Player } from '../types';
 
 export interface TickResult {
-  actions: number;          // how many discrete actions completed
-  stepsConsumed: number;
-  stepsBankedAfter: number; // leftover steps not enough for another action
+  stepsTowardsTarget: number; // progress after this tick
+  targetSteps: number;        // the tool-adjusted requirement it is measured against
+  complete: boolean;
 }
 
-// Apply the equipped tool's efficiency to the base step cost.
-// efficiency of 0.15 means 15% off, so step cost * (1 - 0.15) = 85% of base.
-export function effectiveStepCost(activity: Activity, player: Player): number {
+// Apply the equipped tool's efficiency to the quest's step requirement.
+// efficiency of 0.15 means 15% off, so target * (1 - 0.15) = 85% of base.
+//
+// Tools used to discount a per-action cost; with a flat target they discount
+// the target itself, which is the same 15% saving over the whole quest.
+export function effectiveTargetSteps(activity: Activity, player: Player): number {
   const equippedId = player.equipped[activity.skill];
-  if (!equippedId) return activity.stepCost;
+  if (!equippedId) return activity.targetSteps;
   const tool = itemById(equippedId);
-  if (!tool || tool.kind !== 'tool' || !tool.tool) return activity.stepCost;
+  if (!tool || tool.kind !== 'tool' || !tool.tool) return activity.targetSteps;
   const mult = 1 - tool.tool.efficiency;
-  return Math.max(1, Math.round(activity.stepCost * mult));
+  return Math.max(1, Math.round(activity.targetSteps * mult));
 }
 
 // Returns an unapplied TickResult. The caller decides whether to apply or
 // discard (we'll always apply, but separating compute from mutation makes
 // the logic easy to unit-test).
-//
-// Actions are capped at the quest's remaining count, and steps are only
-// consumed for actions actually credited — so once a quest is finished,
-// further walking banks steps rather than being silently burned.
 export function computeTick(player: Player, freshSteps: number): TickResult | null {
   if (!player.current) return null;
   const act = activityById(player.current.activityId);
   if (!act) return null;
 
-  const cost = effectiveStepCost(act, player);
-  const totalBank = player.current.stepsBanked + freshSteps;
-  const remaining = Math.max(0, act.targetActions - player.current.actionsCompleted);
-
-  const actions = Math.min(Math.floor(totalBank / cost), remaining);
-  if (actions <= 0) {
-    return { actions: 0, stepsConsumed: 0, stepsBankedAfter: totalBank };
-  }
-
-  const stepsConsumed = actions * cost;
+  const targetSteps = effectiveTargetSteps(act, player);
+  const stepsTowardsTarget = player.current.totalSteps + Math.max(0, freshSteps);
 
   return {
-    actions,
-    stepsConsumed,
-    stepsBankedAfter: totalBank - stepsConsumed,
+    stepsTowardsTarget,
+    targetSteps,
+    complete: stepsTowardsTarget >= targetSteps,
   };
 }

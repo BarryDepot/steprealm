@@ -35,16 +35,23 @@ export const items: ItemDef[] = [
     tool: { skill: 'mining',      efficiency: 0.30 }, rarity: 'rare' },
 ];
 
+// Quests for the Disenchanted Forest, the starter region.
+//
+// targetSteps is scaled by the level gate rather than by the old per-action
+// step costs: with a flat target the tier a quest unlocks at is the only
+// meaningful difficulty signal left. The two level-1 quests are a short walk;
+// by level 8 a quest is five times that. Rewards are set to hold the previous
+// xp-per-step and items-per-step rates, so the change alters pacing rather
+// than the rate of progression.
 export const activities: Activity[] = [
-  // Disenchanted Forest - the starter region
   { id: 'chop_birch',   name: 'Chop Birch Tree', skill: 'woodcutting',
-    stepCost: 50, xpReward: 8,  yieldItem: 'birch_log',  minLevel: 1, targetActions: 5 },
+    targetSteps: 50,  yieldItem: 'birch_log',  yieldCount: 1, xpReward: 8,   minLevel: 1 },
   { id: 'chop_oak',     name: 'Chop Oak Tree',   skill: 'woodcutting',
-    stepCost: 40, xpReward: 18, yieldItem: 'oak_log',    minLevel: 5, targetActions: 5 },
+    targetSteps: 150, yieldItem: 'oak_log',    yieldCount: 4, xpReward: 70,  minLevel: 5 },
   { id: 'mine_copper',  name: 'Mine Copper Vein', skill: 'mining',
-    stepCost: 30, xpReward: 10, yieldItem: 'copper_ore', minLevel: 1, targetActions: 5 },
+    targetSteps: 60,  yieldItem: 'copper_ore', yieldCount: 2, xpReward: 20,  minLevel: 1 },
   { id: 'mine_iron',    name: 'Mine Iron Vein',   skill: 'mining',
-    stepCost: 50, xpReward: 22, yieldItem: 'iron_ore',   minLevel: 8, targetActions: 5 },
+    targetSteps: 250, yieldItem: 'iron_ore',   yieldCount: 5, xpReward: 110, minLevel: 8 },
 ];
 
 export const recipes: Recipe[] = [
