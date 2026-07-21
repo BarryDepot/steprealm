@@ -60,8 +60,8 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
   // watchStepCount reports a cumulative count since the subscription began,
   // not a per-event delta, so this ref is the running total to diff against.
   const rawStepsRef = useRef(0);
-  // The value of rawStepsRef at the last successful flush — the baseline
-  // unsyncedSteps is measured from.
+  // How much of rawStepsRef the server has already accepted. unsyncedSteps is
+  // the remainder above this, never a reset to zero — see catchUp.
   const unsyncedBaselineRef = useRef(0);
 
   // Held in a ref so the AppState listener always sees the current value
@@ -92,11 +92,17 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
       if (steps > 0) {
         await onSteps(steps, from, now);
       }
-      // Whatever was walked up to "now" has been reported (or queued while
-      // offline — see reportSteps), so the optimistic count restarts from
-      // here rather than double-adding the same steps next tick.
-      unsyncedBaselineRef.current = rawStepsRef.current;
-      setUnsyncedSteps(0);
+      // Credit exactly what the server was told about, and no more.
+      //
+      // Resetting to zero here would be wrong. Core Motion's historical store
+      // lags its live feed, so getStepCountAsync routinely returns fewer steps
+      // than watchStepCount has already put on screen. Zeroing would discard
+      // that difference, and the display would climb and then visibly drop
+      // back a few steps on every flush. Subtracting only the accepted count
+      // leaves the not-yet-historical remainder in place, where the next flush
+      // will pick it up once Core Motion catches up.
+      unsyncedBaselineRef.current += steps;
+      setUnsyncedSteps(Math.max(0, rawStepsRef.current - unsyncedBaselineRef.current));
     } catch (err) {
       // A read failure is not fatal: the high-water mark has not moved, so the
       // same window is retried on the next resume and nothing is lost. But a
