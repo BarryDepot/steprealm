@@ -46,8 +46,13 @@ npm run db:setup
 npm start
 ```
 
-`db:setup` creates the database and its tables and prints what it made.
-`npm start` should print `StepRealm API listening on :3000`.
+`db:setup` creates the database and its tables, prints the host it is
+targeting, and lists what it made. `npm start` should print
+`StepRealm API listening on :3000`.
+
+> **Deploying too?** The hosted database has its own file, `server/.env.render`,
+> and its own command, `npm run db:setup:remote`. You never edit `DATABASE_URL`
+> to switch between the two. See [SETUP.md](SETUP.md) §2.1.
 
 > **Windows Firewall will pop up the first time.** Tick **Private networks**
 > and allow it. If you dismiss it, your phone cannot reach the server and the
@@ -123,12 +128,14 @@ Both devices must be on the same Wi-Fi. If you change `.env`, restart
 
 ```bash
 cd server
-npm test          # 48 tests: 30 unit on the game rules, 18 integration
+npm test          # 67 tests: 46 unit on the game rules, 21 integration
 npm run typecheck
 ```
 
-The integration tests need `DATABASE_URL` set and the schema applied. They
-create their own players and don't touch existing rows.
+The integration tests read `server/.env` and need the schema applied there.
+They always run against your local database — `server/.env.render` is used
+only by `db:setup:remote` — and they create their own players, leaving
+existing rows alone.
 
 ---
 

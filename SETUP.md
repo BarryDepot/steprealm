@@ -14,10 +14,8 @@ Nothing else to do. `npm run db:setup` creates the database and tables itself,
 so you need neither pgAdmin nor `psql` on your PATH.
 
 **Alternative — skip the local install.** Create a free project at
-supabase.com, copy its connection string into `server/.env`, and set
-`PGSSL=true`. This is worth considering: it is the same database your deployed
-API will use, so there is one fewer thing that behaves differently between your
-laptop and the demo.
+supabase.com and put its connection string in `server/.env.render` (see §2.1),
+which keeps it separate from your local one.
 
 ---
 
@@ -27,7 +25,7 @@ Two terminals, every time.
 
 ```
 cd server
-copy .env.example .env       ... edit DATABASE_URL with your password
+copy .env.example .env       ... put your postgres password in DATABASE_URL
 npm install
 npm run db:setup             ... first run only
 npm start
@@ -40,6 +38,43 @@ npx expo start
 ```
 
 Scan the QR with the iOS Camera app.
+
+### 2.1 Local and hosted databases
+
+The two connection strings live in two files. You never edit one to reach the
+other, and you never have to remember which is currently pasted in:
+
+| File | Holds | Used by |
+| --- | --- | --- |
+| `server/.env` | Your local PostgreSQL | `npm start`, `npm test`, `npm run db:setup` |
+| `server/.env.render` | Render's **External** Database URL, `PGSSL=true` | `npm run db:setup:remote` only |
+
+Both are gitignored. Templates for each — `.env.example` and
+`.env.render.example` — are committed, so a fresh clone shows what is needed.
+
+To set up the hosted one, once:
+
+```
+cd server
+copy .env.render.example .env.render
+```
+
+Then paste Render's **External Database URL** into it. Render's dashboard also
+shows an *Internal* URL; that one resolves only from inside Render's network
+and will not connect from your laptop.
+
+Applying the schema to each:
+
+```
+npm run db:setup             ... local, no prompt
+npm run db:setup:remote      ... hosted, prints the target and asks first
+```
+
+The remote command names the host it is about to affect, warns that it destroys
+every table, and waits for you to type `yes`. Passwords are never printed. For
+scripted use, `npm run db:setup:remote -- --force` skips the prompt; without a
+terminal and without `--force` it refuses and exits non-zero rather than
+pretending to have run.
 
 ---
 
@@ -68,8 +103,15 @@ it times out, it is the firewall or the network.
 
 ### `npm run db:setup` fails to connect
 
-PostgreSQL is not running, or the password in `DATABASE_URL` is wrong. Check
+PostgreSQL is not running, or the password in `server/.env` is wrong. Check
 Services (`services.msc`) for `postgresql-x64-16` and start it if stopped.
+
+### `npm run db:setup:remote` fails to connect
+
+Almost always the wrong URL: Render shows both an *Internal* and an *External*
+Database URL, and only the External one is reachable from your laptop. Check
+which is in `server/.env.render`. The command prints the host it resolved, so
+compare that against the dashboard.
 
 ### No step data on the phone
 
@@ -101,7 +143,7 @@ work while you were away. Worth recording for your demo video.
 
 ```
 cd server
-npm test          ... 48 tests: 30 unit on game rules, 18 integration
+npm test          ... 67 tests: 46 unit on game rules, 21 integration
 npm run typecheck
 ```
 
@@ -109,7 +151,8 @@ Integration tests need `server/.env` present and the schema applied. They
 create their own players and leave existing rows alone.
 
 Note that `npm run db:setup` **drops and recreates** every table. It is a
-first-run and reset command, not a migration.
+first-run and reset command, not a migration. The same is true of
+`npm run db:setup:remote`, which is why that one makes you confirm.
 
 ---
 
@@ -121,10 +164,21 @@ firewall in a room you do not control.
 Railway or Render, pointed at the `server/` folder:
 
 - Add a managed PostgreSQL instance; it provides `DATABASE_URL`
-- Set `PGSSL=true`
-- Run the schema once against the hosted database
+- Set `PGSSL=true` in the host's own environment settings
+- Put the External Database URL in `server/.env.render` (§2.1) and run
+  `npm run db:setup:remote` once to create the tables
 - Change `EXPO_PUBLIC_API_URL` in the client `.env` to the deployed URL and
-  restart `expo start`
+  restart with `npx expo start -c`
+
+The deployed API reads its configuration from the host's environment
+variables, not from any `.env` file in the repo — `server/.env.render` is only
+ever read by `db:setup:remote`, from your laptop.
+
+> **After changing game rules or the schema, the deploy is not the whole job.**
+> Render serves what is on GitHub `main`, so unpushed work is invisible to the
+> phone; and a schema change needs `db:setup:remote` as well, or the new code
+> meets old columns. `curl https://<your-app>.onrender.com/api/content` shows
+> what the deployed server actually believes.
 
 ---
 

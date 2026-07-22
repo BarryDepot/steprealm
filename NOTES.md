@@ -57,7 +57,7 @@ also drives the activity screen's optimistic progress bar between flushes).
 ```
 # API — from server/
 npm start            # dev server on :3000
-npm test             # 63 tests (43 unit, 20 integration); needs .env + schema
+npm test             # 67 tests (46 unit, 21 integration); needs .env + schema
 npm run typecheck
 npm run db:setup     # DROPS and recreates all tables
 
@@ -87,6 +87,8 @@ survives a reload — keep that property.
 - Abandoning a quest forfeits uncollected progress. The home screen blocks
   starting a second quest so this cannot happen by accident, but there is no
   confirmation on the abandon button itself.
+- Steps walked past a quest's target do not carry into the next quest. They
+  still bank for crafting, so they are not lost outright.
 - `GET /api/content` exists to remove the duplicated game content but the
   client does not consume it yet.
 - `savePlayer` rewrites inventory and equipment wholesale rather than diffing.
