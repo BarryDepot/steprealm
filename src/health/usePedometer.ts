@@ -40,6 +40,27 @@ const MAX_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 // on Render's free tier, not so chatty that it keeps the dyno permanently hot.
 const FLUSH_INTERVAL_MS = 5_000;
 
+// How far short of the present each catch-up window stops.
+//
+// Core Motion has not committed the last second or two of walking to its
+// historical store when getStepCountAsync is called. Ending a window at the
+// current instant therefore reads a total that is short by however many steps
+// are still in flight — and because the window's end becomes the server's
+// high-water mark, the next window starts *after* those steps. They fall
+// between the two and are never asked for again.
+//
+// Ending the window slightly in the past leaves that settling period outside
+// it, so every step is inside exactly one window.
+//
+// The trade is that crediting lags reality by up to this much: steps taken in
+// the last few seconds are not yet on the server. They are not lost, only
+// pending, and the next flush picks them up. Delayed is recoverable, skipped
+// is not — and the optimistic display already covers the gap on screen, so
+// the lag is invisible to the player.
+//
+// Kept below FLUSH_INTERVAL_MS so consecutive windows still meet end to end.
+const SETTLE_LAG_MS = 3_000;
+
 // iOS reports a denied motion permission as an error on the read, not through
 // the permission API. The wording is not contractual, so this is best effort.
 function looksLikePermissionError(err: unknown): boolean {
@@ -77,20 +98,23 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
   const catchUp = useCallback(async () => {
     if (!enabled || syncing.current) return;
 
-    const now = new Date();
-    const earliest = new Date(now.getTime() - MAX_LOOKBACK_MS);
+    const until = new Date(Date.now() - SETTLE_LAG_MS);
+    const earliest = new Date(until.getTime() - MAX_LOOKBACK_MS);
     const from = lastSyncRef.current && lastSyncRef.current > earliest
       ? lastSyncRef.current
       : earliest;
 
-    if (from >= now) return;
+    // Nothing has settled since the last mark yet. Common on a resume that
+    // lands within the lag of the previous flush — wait for the next one
+    // rather than sending an empty or backwards window.
+    if (from >= until) return;
 
     syncing.current = true;
     try {
-      const result = await Pedometer.getStepCountAsync(from, now);
+      const result = await Pedometer.getStepCountAsync(from, until);
       const steps = result?.steps ?? 0;
       if (steps > 0) {
-        await onSteps(steps, from, now);
+        await onSteps(steps, from, until);
       }
       // Credit exactly what the server was told about, and no more.
       //

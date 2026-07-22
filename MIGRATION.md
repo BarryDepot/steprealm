@@ -59,7 +59,16 @@ The offline progression feature — *"start an activity, close the app, walk in
 real life, and return later to claim resources and XP"* — is therefore
 delivered as specified. The implementation stores a high-water mark
 (`players.last_step_sync_at`) and, on resume, requests the step count between
-that timestamp and the present. See `src/health/usePedometer.ts`.
+that timestamp and a few seconds before the present. See
+`src/health/usePedometer.ts`.
+
+Stopping short of the present is deliberate. Core Motion commits steps to its
+queryable history a second or two after they are taken, so a window ending
+"now" reads a total that is short by whatever is still settling — and since
+that window's end becomes the next window's start, those steps would fall
+between the two and never be requested again. Ending each window slightly in
+the past makes consecutive windows tile exactly, at the cost of crediting the
+most recent few seconds on the following sync rather than the current one.
 
 ### Residual limitations
 
