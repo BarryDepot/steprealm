@@ -3,6 +3,23 @@
 
 import type { Activity, ItemDef, Recipe, Skill } from '../types';
 
+// The starter region and its town.
+//
+// The proposal's MVP scope is "a single starting region with 3-4 activity
+// nodes and one town", and these name that framing so the interface matches
+// the world the proposal describes. Purely descriptive: no rule reads them,
+// and the quest list below is the region's node list.
+export const region = {
+  name: 'Disenchanted Forest',
+  blurb: 'Overgrown and picked over, but the wood and ore are still good.',
+};
+
+export const town = {
+  name: 'Emberhollow',
+  location: 'The Forge',
+  blurb: 'The region\'s only working forge. Smithing happens here, nowhere else.',
+};
+
 export const skills: Skill[] = [
   { id: 'woodcutting', name: 'Woodcutting' },
   { id: 'mining',      name: 'Mining' },
