@@ -1,11 +1,23 @@
-// Treasure box drops. WalkScape uses roughly 1-in-200 per completed action
-// from what I saw in the dev video. I'll keep that rate as a starting point
-// and tune it later if the numbers feel too stingy in testing.
+// Treasure box drops.
 
 import { items } from '../content';
 import type { ItemId, Rarity, SkillId } from '../types';
 
-const BASE_DROP_CHANCE = 1 / 200;
+/**
+ * Chance of a chest per completed quest.
+ *
+ * This was 1-in-200 when the unit of progress was a single action and a quest
+ * was five of them, so a chest averaged once per forty quests. Once quests
+ * became the unit and the roll moved to one per quest, that rate left a player
+ * walking tens of thousands of steps between drops — a reward tier nobody
+ * would see during a demonstration, or plausibly ever.
+ *
+ * 1-in-8 puts a chest roughly within an evening's walking: at the starter
+ * quests' 50-60 steps, around 400 steps between drops on average. Frequent
+ * enough that the tier is visibly part of the game, rare enough that crafting
+ * remains the reliable route to a better tool rather than an afterthought.
+ */
+const DROP_CHANCE_PER_QUEST = 1 / 8;
 
 // Rarity roll - this gets called when a drop has already been confirmed.
 function rollRarity(): Rarity {
@@ -36,10 +48,10 @@ export interface LootRoll {
   rarity?: Rarity;
 }
 
-// Call once per completed action. Returns whether a chest dropped and what
-// was inside if so. For now one chest = one piece of gear, no decoupling.
+// Call once per completed quest. Returns whether a chest dropped and what was
+// inside if so. For now one chest = one piece of gear, no decoupling.
 export function rollLoot(skill: SkillId): LootRoll {
-  if (Math.random() >= BASE_DROP_CHANCE) return { dropped: false };
+  if (Math.random() >= DROP_CHANCE_PER_QUEST) return { dropped: false };
   const rarity = rollRarity();
   const tool = pickToolForDrop(skill, rarity);
   if (!tool) return { dropped: false };

@@ -34,6 +34,7 @@ export const items: ItemDef[] = [
   { id: 'iron_ore',    name: 'Iron Ore',    kind: 'resource' },
   { id: 'bronze_bar',  name: 'Bronze Bar',  kind: 'resource' },
   { id: 'iron_bar',    name: 'Iron Bar',    kind: 'resource' },
+  { id: 'steel_bar',   name: 'Steel Bar',   kind: 'resource' },
 
   // Starter tools - given on first run.
   { id: 'basic_hatchet',  name: 'Basic Hatchet',  kind: 'tool',
@@ -50,6 +51,14 @@ export const items: ItemDef[] = [
     tool: { skill: 'woodcutting', efficiency: 0.30 }, rarity: 'rare' },
   { id: 'iron_pickaxe',   name: 'Iron Pickaxe',   kind: 'tool',
     tool: { skill: 'mining',      efficiency: 0.30 }, rarity: 'rare' },
+
+  // Epic tier. The proposal specifies three rarities, but until these existed
+  // the epic branch of the loot table had nothing to return and silently fell
+  // back to a lower tier — the rarity was declared and unreachable.
+  { id: 'steel_hatchet',  name: 'Steel Hatchet',  kind: 'tool',
+    tool: { skill: 'woodcutting', efficiency: 0.45 }, rarity: 'epic' },
+  { id: 'steel_pickaxe',  name: 'Steel Pickaxe',  kind: 'tool',
+    tool: { skill: 'mining',      efficiency: 0.45 }, rarity: 'epic' },
 ];
 
 // Quests for the Disenchanted Forest, the starter region.
@@ -89,6 +98,24 @@ export const recipes: Recipe[] = [
     inputs: [{ item: 'bronze_bar', count: 2 }, { item: 'birch_log', count: 1 }],
     output: { item: 'bronze_pickaxe', count: 1 },
     xpReward: 45, minLevel: 5, stepCost: 75 },
+
+  // Epic tier. Same raw → bar → tool shape as bronze: iron ore and oak smelt
+  // into a steel bar, which forges into the epic tools. The oak stands in for
+  // the carbon steel needs, which keeps the chain to resources the starter
+  // region already produces rather than introducing a new raw material.
+  { id: 'smelt_steel', name: 'Smelt Steel Bar', skill: 'smithing',
+    inputs: [{ item: 'iron_ore', count: 3 }, { item: 'oak_log', count: 2 }],
+    output: { item: 'steel_bar', count: 1 },
+    xpReward: 40, minLevel: 12, stepCost: 60 },
+
+  { id: 'craft_steel_hatchet', name: 'Steel Hatchet', skill: 'smithing',
+    inputs: [{ item: 'steel_bar', count: 2 }, { item: 'oak_log', count: 1 }],
+    output: { item: 'steel_hatchet', count: 1 },
+    xpReward: 70, minLevel: 15, stepCost: 120 },
+  { id: 'craft_steel_pickaxe', name: 'Steel Pickaxe', skill: 'smithing',
+    inputs: [{ item: 'steel_bar', count: 3 }, { item: 'oak_log', count: 1 }],
+    output: { item: 'steel_pickaxe', count: 1 },
+    xpReward: 90, minLevel: 18, stepCost: 160 },
 ];
 
 // Helpers so screens don't have to know about array internals.

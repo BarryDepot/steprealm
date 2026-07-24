@@ -15,8 +15,8 @@ import {
 import { effectiveTargetSteps, computeTick } from '../src/game/tick';
 import { levelFromXp, xpForLevel, progressInLevel } from '../src/game/xp';
 import { rollLoot } from '../src/game/loot';
-import { activityById } from '../src/content';
-import type { CurrentActivity, Player } from '../src/types';
+import { activityById, itemById, recipeById, recipes } from '../src/content';
+import type { CurrentActivity, Player, Rarity } from '../src/types';
 
 // A fresh player, matching the seed state the repository writes on signup.
 function newPlayer(overrides: Partial<Player> = {}): Player {
@@ -50,7 +50,7 @@ function quest(activityId: string, overrides: Partial<CurrentActivity> = {}): Cu
   };
 }
 
-// Loot is a 1-in-200 roll per action, so any test asserting an exact
+// Loot is a 1-in-8 roll per quest, so any test asserting an exact
 // inventory has to pin it down or it fails intermittently.
 function withoutLoot<T>(fn: () => T): T {
   const original = Math.random;
@@ -274,12 +274,12 @@ describe('collecting a quest', () => {
 
   test('loot is rolled once per completed quest', () => {
     const original = Math.random;
-    Math.random = () => 0; // guarantees a drop on every roll
+    Math.random = () => 0; // guarantees a drop, and the epic tier with it
     try {
       const result = claimQuest(finished());
-      // A single guaranteed drop on top of the starter hatchet.
-      assert.equal(countOf(result.player, 'basic_hatchet'), 2);
+      // Exactly one chest, however many rewards the quest itself paid out.
       assert.equal(result.events.filter(e => e.kind === 'loot').length, 1);
+      assert.equal(countOf(result.player, 'steel_hatchet'), 1);
     } finally {
       Math.random = original;
     }
@@ -427,39 +427,164 @@ describe('crafting', () => {
     const result = craft(player, 'smelt_bronze');
     assert.ok(!result.player.inventory.some(e => e.item === 'copper_ore'));
   });
+
+  // The epic tier is only reachable by crafting or a rare drop, so if this
+  // chain does not resolve the tier is decorative.
+  describe('the steel chain', () => {
+    const smith = (level: number, inventory: Player['inventory']) => newPlayer({
+      skills: {
+        woodcutting: { xp: 0, level: 1 },
+        mining: { xp: 0, level: 1 },
+        smithing: { xp: xpForLevel(level), level },
+      },
+      inventory,
+      current: quest('mine_iron', { stepsBanked: 500 }),
+    });
+
+    test('iron ore and oak smelt into a steel bar', () => {
+      const player = smith(12, [
+        { item: 'iron_ore', count: 3 },
+        { item: 'oak_log', count: 2 },
+      ]);
+      const result = craft(player, 'smelt_steel');
+      assert.equal(countOf(result.player, 'steel_bar'), 1);
+      assert.equal(result.player.skills.smithing.xp, xpForLevel(12) + 40);
+    });
+
+    test('steel bars forge into the epic tools', () => {
+      const hatchet = craft(smith(15, [
+        { item: 'steel_bar', count: 2 },
+        { item: 'oak_log', count: 1 },
+      ]), 'craft_steel_hatchet');
+      assert.equal(countOf(hatchet.player, 'steel_hatchet'), 1);
+
+      const pickaxe = craft(smith(18, [
+        { item: 'steel_bar', count: 3 },
+        { item: 'oak_log', count: 1 },
+      ]), 'craft_steel_pickaxe');
+      assert.equal(countOf(pickaxe.player, 'steel_pickaxe'), 1);
+    });
+
+    test('the steel tools are epic and cut the step target by 45 per cent', () => {
+      for (const id of ['steel_hatchet', 'steel_pickaxe']) {
+        const def = itemById(id);
+        assert.equal(def?.rarity, 'epic', `${id} should be epic`);
+        assert.equal(def?.tool?.efficiency, 0.45);
+      }
+
+      const player = newPlayer({ equipped: { woodcutting: 'steel_hatchet' } });
+      const act = activityById('chop_birch')!; // 50 steps base
+      assert.equal(effectiveTargetSteps(act, player), 28); // round(50 * 0.55)
+    });
+
+    test('the steel chain is gated above the bronze chain', () => {
+      const bronze = recipeById('craft_bronze_pickaxe')!;
+      const steel = recipeById('craft_steel_pickaxe')!;
+      assert.ok(steel.minLevel > bronze.minLevel);
+      assert.ok(steel.stepCost > bronze.stepCost);
+    });
+
+    test('every recipe input is an item that exists', () => {
+      for (const recipe of recipes) {
+        for (const input of recipe.inputs) {
+          assert.ok(itemById(input.item),
+            `${recipe.id} needs ${input.item}, which is not in the item list`);
+        }
+        assert.ok(itemById(recipe.output.item),
+          `${recipe.id} produces ${recipe.output.item}, which is not in the item list`);
+      }
+    });
+  });
 });
 
 describe('loot rolls', () => {
-  test('no chest drops when the roll misses', () => {
+  // Runs fn with Math.random pinned, then always restores it — a leaked stub
+  // would silently determine the outcome of every later test in the file.
+  function withRandom<T>(value: number, fn: () => T): T {
     const original = Math.random;
-    Math.random = () => 0.99;
+    Math.random = () => value;
     try {
-      assert.equal(rollLoot('woodcutting').dropped, false);
+      return fn();
     } finally {
       Math.random = original;
     }
+  }
+
+  test('no chest drops when the roll misses', () => {
+    assert.equal(withRandom(0.99, () => rollLoot('woodcutting')).dropped, false);
+  });
+
+  test('the drop rate is one in eight quests', () => {
+    // Just inside the threshold drops, exactly on it does not. Pins the rate
+    // itself, so a change to the constant has to be a deliberate one.
+    assert.equal(withRandom(0.124, () => rollLoot('woodcutting')).dropped, true);
+    assert.equal(withRandom(0.125, () => rollLoot('woodcutting')).dropped, false);
+  });
+
+  test('the rate is generous enough to be reachable in play', () => {
+    // Guards the intent behind the number rather than the number itself: at
+    // the old 1-in-200 this quest tier meant tens of thousands of steps
+    // between chests, which is what made the tier unreachable.
+    let drops = 0;
+    const trials = 4_000;
+    for (let i = 0; i < trials; i++) {
+      if (rollLoot('woodcutting').dropped) drops++;
+    }
+    const questsPerDrop = trials / Math.max(1, drops);
+    assert.ok(questsPerDrop < 20,
+      `expected a chest within 20 quests on average, got ${questsPerDrop.toFixed(1)}`);
   });
 
   test('a hit yields a tool belonging to the producing skill', () => {
-    const original = Math.random;
-    Math.random = () => 0; // guarantees the drop and the epic tier
-    try {
-      const roll = rollLoot('mining');
-      assert.equal(roll.dropped, true);
-      assert.ok(roll.item?.includes('pickaxe'),
-        `mining should not drop ${roll.item}`);
-    } finally {
-      Math.random = original;
+    const roll = withRandom(0, () => rollLoot('mining'));
+    assert.equal(roll.dropped, true);
+    assert.ok(roll.item?.includes('pickaxe'),
+      `mining should not drop ${roll.item}`);
+  });
+
+  test('every declared rarity can actually be rolled', () => {
+    // rollRarity uses < 0.05 epic, < 0.30 rare, else common. Each rarity must
+    // have a matching item or pickToolForDrop quietly falls back to another
+    // tier, which is how epic came to be declared but unreachable.
+    const tiers: Array<[number, Rarity]> = [
+      [0.00, 'epic'],
+      [0.20, 'rare'],
+      [0.90, 'common'],
+    ];
+
+    for (const [roll, expected] of tiers) {
+      // The drop check reads Math.random first, so force a hit, then let the
+      // rarity roll see the value under test.
+      let first = true;
+      const original = Math.random;
+      Math.random = () => {
+        if (first) { first = false; return 0; } // guarantees the drop
+        return roll;
+      };
+      try {
+        const result = rollLoot('woodcutting');
+        assert.equal(result.dropped, true, `${expected} tier should drop`);
+        assert.equal(result.rarity, expected);
+        const def = itemById(result.item!);
+        assert.equal(def?.rarity, expected,
+          `${expected} roll returned ${result.item}, which is ${def?.rarity}`);
+      } finally {
+        Math.random = original;
+      }
     }
   });
 
+  test('the epic tier drops the steel tools', () => {
+    const wood = withRandom(0, () => rollLoot('woodcutting'));
+    assert.equal(wood.rarity, 'epic');
+    assert.equal(wood.item, 'steel_hatchet');
+
+    const mine = withRandom(0, () => rollLoot('mining'));
+    assert.equal(mine.rarity, 'epic');
+    assert.equal(mine.item, 'steel_pickaxe');
+  });
+
   test('smithing has no tools to drop, so it never yields a chest', () => {
-    const original = Math.random;
-    Math.random = () => 0;
-    try {
-      assert.equal(rollLoot('smithing').dropped, false);
-    } finally {
-      Math.random = original;
-    }
+    assert.equal(withRandom(0, () => rollLoot('smithing')).dropped, false);
   });
 });
