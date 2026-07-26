@@ -5,17 +5,17 @@
 // genuinely unavailable (the iOS Simulator has no motion hardware), so the app
 // can still be demonstrated without a physical walk.
 
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback, useEffect } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { activities, activityById, skills } from '../src/content/starterRegion';
-import { progressInLevel } from '../src/game/xp';
-import { effectiveTargetSteps } from '../src/game/tick';
-import { useGameStore } from '../src/state/gameStore';
-import { usePedometer } from '../src/health/usePedometer';
-import { AnimatedCounter, AnimatedProgressBar } from '../src/ui/AnimatedProgress';
-import { palette, styles } from '../src/ui/styles';
+import { activities, activityById, region, skills } from '../../src/content/starterRegion';
+import { progressInLevel } from '../../src/game/xp';
+import { effectiveTargetSteps } from '../../src/game/tick';
+import { useGameStore } from '../../src/state/gameStore';
+import { usePedometer } from '../../src/health/usePedometer';
+import { AnimatedCounter, AnimatedProgressBar } from '../../src/ui/AnimatedProgress';
+import { palette, styles } from '../../src/ui/styles';
 
 export default function Home() {
   const player          = useGameStore(s => s.player);
@@ -79,8 +79,9 @@ export default function Home() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 32 }}>
-      <Text style={styles.title}>Disenchanted Forest</Text>
-      <Text style={styles.textDim}>
+      <Text style={styles.title}>{region.name}</Text>
+      <Text style={styles.textDim}>{region.blurb}</Text>
+      <Text style={[styles.textDim, { marginTop: 4 }]}>
         Total steps walked: {player.totalSteps.toLocaleString()}
         {liveSteps > 0 ? `  ·  +${liveSteps} since opening` : ''}
       </Text>
@@ -175,7 +176,9 @@ export default function Home() {
       })}
 
       <Text style={styles.sectionLabel}>
-        {activeQuest ? 'Quests — finish the active one first' : 'Quests'}
+        {activeQuest
+          ? `Activity nodes — finish the active quest first`
+          : `Activity nodes · ${activities.length} in this region`}
       </Text>
       {activities.map(act => {
         const target = effectiveTargetSteps(act, player);
@@ -221,18 +224,6 @@ export default function Home() {
         </>
       )}
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
-        <Link href="/inventory" asChild>
-          <Pressable style={[styles.button, { flex: 1 }]}>
-            <Text style={styles.buttonText}>Inventory</Text>
-          </Pressable>
-        </Link>
-        <Link href="/forge" asChild>
-          <Pressable style={[styles.button, { flex: 1 }]}>
-            <Text style={styles.buttonText}>Forge</Text>
-          </Pressable>
-        </Link>
-      </View>
     </ScrollView>
   );
 }

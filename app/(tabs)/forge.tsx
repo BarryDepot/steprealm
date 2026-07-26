@@ -1,14 +1,17 @@
-// The forge.
+// The forge, in the region's town.
 //
 // Crafting is the only source of Smithing XP, so without this screen the third
 // MVP skill is unreachable. Recipes cost banked steps as well as materials,
 // which keeps walking as the game's single currency.
+//
+// Presented as a place rather than a menu — the proposal's MVP describes one
+// town alongside the starter region, and this is it.
 
 import { ScrollView, Pressable, Text, View } from 'react-native';
 
-import { itemById, recipes } from '../src/content/starterRegion';
-import { useGameStore } from '../src/state/gameStore';
-import { palette, styles } from '../src/ui/styles';
+import { itemById, recipes, town } from '../../src/content/starterRegion';
+import { useGameStore } from '../../src/state/gameStore';
+import { palette, styles } from '../../src/ui/styles';
 
 const prettyName = (id: string) => itemById(id)?.name ?? id.replace(/_/g, ' ');
 
@@ -26,8 +29,9 @@ export default function Forge() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={{ paddingBottom: 32 }}>
-      <Text style={styles.title}>Forge</Text>
-      <Text style={styles.textDim}>
+      <Text style={styles.title}>{town.location}</Text>
+      <Text style={styles.textDim}>{town.name} · {town.blurb}</Text>
+      <Text style={[styles.textDim, { marginTop: 4 }]}>
         Smithing Lv {player.skills.smithing.level} · {banked} steps banked
       </Text>
 
