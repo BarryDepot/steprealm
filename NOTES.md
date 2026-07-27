@@ -20,9 +20,14 @@ server decides what they earned, persists it, and returns the new state. This
 was deliberate: the brief requires meaningful server-side functionality, and a
 client that computes its own XP can fabricate progression.
 
-`src/game/` exists on both sides. The client copy renders step costs and XP
-bars optimistically; `server/src/game/` is the real thing. Do not add rules to
-the client copy.
+`src/game/` exists on both sides, but only `tick.ts` and `xp.ts` — the client
+copy renders step targets and XP bars optimistically; `server/src/game/` is the
+real thing. Do not add rules to the client copy. `loot.ts` is server-only for
+exactly this reason: the client never rolls, so a second copy could only drift.
+
+Screens live under `app/(tabs)/`. Adding a destination means adding a
+`Tabs.Screen`, not a button on another screen — that is how Inventory and Forge
+previously ended up one edit away from being orphaned.
 
 ## Constraints that have already caused bugs
 
@@ -57,7 +62,7 @@ also drives the activity screen's optimistic progress bar between flushes).
 ```
 # API — from server/
 npm start            # dev server on :3000
-npm test             # 67 tests (46 unit, 21 integration); needs .env + schema
+npm test             # 76 tests (55 unit, 21 integration); needs .env + schema
 npm run typecheck
 npm run db:setup     # DROPS and recreates all tables
 

@@ -207,7 +207,50 @@ once per quest, but a quest is now a much shorter walk than five actions were.
 
 ---
 
-## 4. Additions not present in the proposal
+## 4. Loot rate and the epic tier
+
+### What was proposed
+
+> Completed actions carry a small chance of a treasure box containing a tool,
+> in one of three rarities: common, rare, epic.
+>
+> — Project Proposal, §3
+
+### What changed
+
+Two corrections, both consequences of §3 rather than changes of intent.
+
+**The drop rate moved from 1-in-200 per action to 1-in-8 per quest.** The
+original figure was set when an action was the unit of progress and a quest was
+five of them, which put a chest at roughly one per forty quests. When quests
+became the unit and the roll moved to one per quest, that rate survived
+unchanged and became roughly fifty times rarer than intended in practice —
+tens of thousands of steps between drops. A reward tier at that frequency is
+present in the code and absent from the game. The rate is now a single named
+constant, `DROP_CHANCE_PER_QUEST` in `server/src/game/loot.ts`, with the
+reasoning recorded beside it.
+
+**The epic rarity was given items.** The rarity was declared in the type and
+selected by the roll, but no item carried it, so `pickToolForDrop` fell through
+to its lower-tier fallback every time. Epic was unreachable by construction.
+Two epic tools now exist — Steel Hatchet and Steel Pickaxe, 45% step
+reduction — together with a Steel Bar intermediate and three recipes following
+the same raw → bar → tool shape as the bronze chain. They use iron ore and oak
+from the existing region rather than introducing a new raw material.
+
+### Why this matters to the evaluation
+
+The proposal's reward structure was implemented but not reachable: a marker
+walking the app for the length of a demonstration would have seen neither a
+chest nor an epic item, and would have been correct to conclude the feature was
+absent. The mechanism was always there; the numbers made it unobservable.
+
+Both are covered by tests — the rate boundary, that each declared rarity
+returns an item of that rarity, and that the steel chain resolves end to end.
+
+---
+
+## 5. Additions not present in the proposal
 
 | Addition | Rationale |
 | --- | --- |
@@ -218,7 +261,7 @@ once per quest, but a quest is now a much shorter walk than five actions were.
 
 ---
 
-## 5. Scope not delivered
+## 6. Scope not delivered
 
 | Proposed item | Status |
 | --- | --- |
@@ -229,7 +272,7 @@ once per quest, but a quest is now a much shorter walk than five actions were.
 
 ---
 
-## 6. Requirements traceability
+## 7. Requirements traceability
 
 Functional requirements from the Requirements Specification (12 June 2026) that
 referenced Health Connect explicitly should be read as referring to the device

@@ -111,12 +111,13 @@ Both devices must be on the same Wi-Fi. If you change `.env`, restart
 ## What's working
 
 - Three skills (Woodcutting, Mining, Smithing), each with XP and levelling
-- Four starter activities across the Disenchanted Forest
-- Step-cost activity loop: walking N steps funds whole actions, and leftover
-  steps stay banked for the next one
-- Tools with work-efficiency multipliers that reduce per-action step cost
-- Crafting at the forge — the only source of Smithing XP
-- Treasure-box loot rolls (~1 in 200 per action), three rarity tiers
+- Four quests across the Disenchanted Forest, the starter region
+- Quest loop: each quest is a flat step target — walk it, then collect a fixed
+  reward of resources and XP
+- Tools with work-efficiency multipliers that reduce a quest's step target
+- Crafting at the forge in Emberhollow — the only source of Smithing XP
+- Treasure-box loot rolls (~1 in 8 quests) across three rarity tiers, up to
+  epic steel tools
 - **Real step input** from the device pedometer (iOS Core Motion)
 - **Offline progression** — close the app, walk, reopen, and the steps you took
   while away are credited
@@ -128,7 +129,7 @@ Both devices must be on the same Wi-Fi. If you change `.env`, restart
 
 ```bash
 cd server
-npm test          # 67 tests: 46 unit on the game rules, 21 integration
+npm test          # 76 tests: 55 unit on the game rules, 21 integration
 npm run typecheck
 ```
 
@@ -144,19 +145,22 @@ existing rows alone.
 ```
 app/                    expo-router screens
   _layout.tsx           root stack + theming
-  index.tsx             home — skills, activities, sync status
-  activity.tsx          live activity screen
-  inventory.tsx         resources + tools, tap to equip
-  forge.tsx             crafting
+  (tabs)/
+    _layout.tsx         the three permanent destinations
+    index.tsx           Quests — region, skills, quest list, sync status
+    inventory.tsx       resources + the full tool ladder, tap to equip
+    forge.tsx           crafting, in the town of Emberhollow
+  activity.tsx          live quest screen, pushed from Quests
 
 src/
   types.ts              core game types
   api/client.ts         typed API client
   health/usePedometer.ts  Core Motion step reading + resume catch-up
   state/gameStore.ts    zustand store, server-synced, AsyncStorage cache
-  content/starterRegion.ts   activities, items, recipes (display copy)
-  game/                 xp / tick / loot — used client-side for display only
+  content/starterRegion.ts   region, activities, items, recipes (display copy)
+  game/                 xp / tick — used client-side for display only
   ui/styles.ts          shared styles + palette
+  ui/AnimatedProgress.tsx  eased progress bars and counters
 
 server/
   db/schema.sql         PostgreSQL schema
@@ -180,9 +184,10 @@ server/
 | `GET` | `/api/content` | Skills, activities and recipes |
 | `POST` | `/api/players` | Create a character |
 | `GET` | `/api/players/:id` | Full current state |
-| `POST` | `/api/players/:id/steps` | Report walked steps; server awards progress |
-| `POST` | `/api/players/:id/activity` | Start an activity |
-| `DELETE` | `/api/players/:id/activity` | Stop the running activity |
+| `POST` | `/api/players/:id/steps` | Report walked steps; server advances the quest |
+| `POST` | `/api/players/:id/activity` | Start a quest |
+| `POST` | `/api/players/:id/activity/claim` | Collect a finished quest |
+| `DELETE` | `/api/players/:id/activity` | Abandon the running quest |
 | `POST` | `/api/players/:id/equip` | Equip an owned tool |
 | `POST` | `/api/players/:id/craft` | Craft a recipe |
 
@@ -195,11 +200,12 @@ server/
 - **iOS only.** Step reading uses Core Motion. See `MIGRATION.md` for why this
   replaced Android Health Connect and how the Android path would be restored.
 - **`src/game/` is duplicated** between client and server. The client copy is
-  used only to render step costs and XP bars before the server responds; the
+  used only to render step targets and XP bars before the server responds; the
   server copy is authoritative. `GET /api/content` exists to remove this
   duplication but the client does not consume it yet.
-- **Crafting requires an active activity**, since recipes spend banked steps and
-  steps are only banked against a running activity.
+- **Crafting requires an active quest**, since recipes spend banked steps and
+  steps are only banked against a running quest. Collecting a quest clears the
+  pool with it, so crafting means starting a fresh quest and banking the cost.
 - **Simulator has no pedometer.** `Pedometer.isAvailableAsync()` returns false
   and the home screen falls back to manual step buttons. The offline mechanic
   only demonstrates on a physical device.
