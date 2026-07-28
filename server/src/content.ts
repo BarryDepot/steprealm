@@ -99,6 +99,18 @@ export const recipes: Recipe[] = [
     output: { item: 'bronze_pickaxe', count: 1 },
     xpReward: 45, minLevel: 5, stepCost: 75 },
 
+  // Rare tier. These were previously loot-only, which left a hole in the middle
+  // of the ladder — a player could craft bronze, then nothing until steel — and
+  // left iron_bar an orphan, smelted by a recipe and consumed by none.
+  { id: 'craft_iron_hatchet', name: 'Iron Hatchet', skill: 'smithing',
+    inputs: [{ item: 'iron_bar', count: 2 }, { item: 'oak_log', count: 1 }],
+    output: { item: 'iron_hatchet', count: 1 },
+    xpReward: 55, minLevel: 10, stepCost: 90 },
+  { id: 'craft_iron_pickaxe', name: 'Iron Pickaxe', skill: 'smithing',
+    inputs: [{ item: 'iron_bar', count: 3 }, { item: 'oak_log', count: 1 }],
+    output: { item: 'iron_pickaxe', count: 1 },
+    xpReward: 65, minLevel: 12, stepCost: 110 },
+
   // Epic tier. Same raw → bar → tool shape as bronze: iron ore and oak smelt
   // into a steel bar, which forges into the epic tools. The oak stands in for
   // the carbon steel needs, which keeps the chain to resources the starter
@@ -106,12 +118,12 @@ export const recipes: Recipe[] = [
   { id: 'smelt_steel', name: 'Smelt Steel Bar', skill: 'smithing',
     inputs: [{ item: 'iron_ore', count: 3 }, { item: 'oak_log', count: 2 }],
     output: { item: 'steel_bar', count: 1 },
-    xpReward: 40, minLevel: 12, stepCost: 60 },
+    xpReward: 40, minLevel: 14, stepCost: 60 },
 
   { id: 'craft_steel_hatchet', name: 'Steel Hatchet', skill: 'smithing',
     inputs: [{ item: 'steel_bar', count: 2 }, { item: 'oak_log', count: 1 }],
     output: { item: 'steel_hatchet', count: 1 },
-    xpReward: 70, minLevel: 15, stepCost: 120 },
+    xpReward: 70, minLevel: 16, stepCost: 120 },
   { id: 'craft_steel_pickaxe', name: 'Steel Pickaxe', skill: 'smithing',
     inputs: [{ item: 'steel_bar', count: 3 }, { item: 'oak_log', count: 1 }],
     output: { item: 'steel_pickaxe', count: 1 },

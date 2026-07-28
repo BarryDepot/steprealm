@@ -15,7 +15,7 @@ import {
 import { effectiveTargetSteps, computeTick } from '../src/game/tick';
 import { levelFromXp, xpForLevel, progressInLevel } from '../src/game/xp';
 import { rollLoot } from '../src/game/loot';
-import { activityById, itemById, recipeById, recipes } from '../src/content';
+import { activityById, itemById, items, recipeById, recipes } from '../src/content';
 import type { CurrentActivity, Player, Rarity } from '../src/types';
 
 // A fresh player, matching the seed state the repository writes on signup.
@@ -430,7 +430,7 @@ describe('crafting', () => {
 
   // The epic tier is only reachable by crafting or a rare drop, so if this
   // chain does not resolve the tier is decorative.
-  describe('the steel chain', () => {
+  describe('the crafting ladder', () => {
     const smith = (level: number, inventory: Player['inventory']) => newPlayer({
       skills: {
         woodcutting: { xp: 0, level: 1 },
@@ -441,18 +441,32 @@ describe('crafting', () => {
       current: quest('mine_iron', { stepsBanked: 500 }),
     });
 
+    test('iron bars forge into the rare tools', () => {
+      const hatchet = craft(smith(10, [
+        { item: 'iron_bar', count: 2 },
+        { item: 'oak_log', count: 1 },
+      ]), 'craft_iron_hatchet');
+      assert.equal(countOf(hatchet.player, 'iron_hatchet'), 1);
+
+      const pickaxe = craft(smith(12, [
+        { item: 'iron_bar', count: 3 },
+        { item: 'oak_log', count: 1 },
+      ]), 'craft_iron_pickaxe');
+      assert.equal(countOf(pickaxe.player, 'iron_pickaxe'), 1);
+    });
+
     test('iron ore and oak smelt into a steel bar', () => {
-      const player = smith(12, [
+      const player = smith(14, [
         { item: 'iron_ore', count: 3 },
         { item: 'oak_log', count: 2 },
       ]);
       const result = craft(player, 'smelt_steel');
       assert.equal(countOf(result.player, 'steel_bar'), 1);
-      assert.equal(result.player.skills.smithing.xp, xpForLevel(12) + 40);
+      assert.equal(result.player.skills.smithing.xp, xpForLevel(14) + 40);
     });
 
     test('steel bars forge into the epic tools', () => {
-      const hatchet = craft(smith(15, [
+      const hatchet = craft(smith(16, [
         { item: 'steel_bar', count: 2 },
         { item: 'oak_log', count: 1 },
       ]), 'craft_steel_hatchet');
@@ -463,6 +477,64 @@ describe('crafting', () => {
         { item: 'oak_log', count: 1 },
       ]), 'craft_steel_pickaxe');
       assert.equal(countOf(pickaxe.player, 'steel_pickaxe'), 1);
+    });
+
+    test('every tool in the game is craftable', () => {
+      // Loot is a bonus route, never the only one. A tool reachable solely by
+      // a 1-in-8 roll would leave a tier the player cannot work towards.
+      const craftable = new Set(recipes.map(r => r.output.item));
+      const starters = new Set(['basic_hatchet', 'basic_pickaxe']);
+
+      for (const item of items) {
+        if (item.kind !== 'tool' || starters.has(item.id)) continue;
+        assert.ok(craftable.has(item.id),
+          `${item.id} has no recipe, so it can only ever drop`);
+      }
+    });
+
+    test('every resource is consumed by something', () => {
+      // A resource with no use is dead weight in the inventory and a dead end
+      // in the chain — iron_bar was exactly that before the iron tools.
+      const consumed = new Set(recipes.flatMap(r => r.inputs.map(i => i.item)));
+
+      for (const item of items) {
+        if (item.kind !== 'resource') continue;
+        assert.ok(consumed.has(item.id),
+          `${item.id} is produced but never used by any recipe`);
+      }
+    });
+
+    test('each tier is gated above the one below it', () => {
+      // Reads the ladder in order rather than asserting fixed numbers, so
+      // rebalancing stays free but inverting the progression does not.
+      const ladder = [
+        'craft_bronze_hatchet', 'craft_bronze_pickaxe',
+        'craft_iron_hatchet', 'craft_iron_pickaxe',
+        'craft_steel_hatchet', 'craft_steel_pickaxe',
+      ].map(id => recipeById(id)!);
+
+      for (let i = 1; i < ladder.length; i++) {
+        assert.ok(ladder[i].minLevel > ladder[i - 1].minLevel,
+          `${ladder[i].id} should require a higher level than ${ladder[i - 1].id}`);
+        assert.ok(ladder[i].stepCost > ladder[i - 1].stepCost,
+          `${ladder[i].id} should cost more steps than ${ladder[i - 1].id}`);
+      }
+    });
+
+    test('a bar recipe unlocks before the tools that need it', () => {
+      const pairs: Array<[string, string[]]> = [
+        ['smelt_bronze', ['craft_bronze_hatchet', 'craft_bronze_pickaxe']],
+        ['smelt_iron',   ['craft_iron_hatchet', 'craft_iron_pickaxe']],
+        ['smelt_steel',  ['craft_steel_hatchet', 'craft_steel_pickaxe']],
+      ];
+
+      for (const [barId, toolIds] of pairs) {
+        const bar = recipeById(barId)!;
+        for (const toolId of toolIds) {
+          assert.ok(recipeById(toolId)!.minLevel >= bar.minLevel,
+            `${toolId} unlocks before ${barId}, which makes it uncraftable`);
+        }
+      }
     });
 
     test('the steel tools are epic and cut the step target by 45 per cent', () => {
