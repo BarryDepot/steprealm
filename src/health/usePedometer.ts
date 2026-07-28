@@ -35,6 +35,11 @@ interface UsePedometerOptions {
 // the device cannot answer.
 const MAX_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
+// How often to send foreground steps to the server. Short enough that progress
+// visibly ticks along while walking, long enough not to hammer the API — and
+// on Render's free tier, not so chatty that it keeps the dyno permanently hot.
+const FLUSH_INTERVAL_MS = 20_000;
+
 // iOS reports a denied motion permission as an error on the read, not through
 // the permission API. The wording is not contractual, so this is best effort.
 function looksLikePermissionError(err: unknown): boolean {
@@ -161,6 +166,21 @@ export function usePedometer({ onSteps, lastSyncAt, enabled = true }: UsePedomet
     const subscription = AppState.addEventListener('change', handler);
     return () => subscription.remove();
   }, [status, catchUp]);
+
+  // Flush periodically while the app is open.
+  //
+  // Without this, steps walked with the app in the foreground are never
+  // credited — the catch-up above only fires on launch and on resume, and
+  // watchStepCount is display-only. Someone testing by walking while watching
+  // the screen would see nothing happen, which is the first thing anyone
+  // tries. The server holds the high-water mark, so repeating the query is
+  // safe: a window that has already been counted comes back empty.
+  useEffect(() => {
+    if (status !== 'available' || !enabled) return;
+
+    const timer = setInterval(() => { void catchUp(); }, FLUSH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [status, enabled, catchUp]);
 
   return { status, liveSteps, catchUp };
 }

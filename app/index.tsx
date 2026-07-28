@@ -65,14 +65,20 @@ export default function Home() {
       </Text>
 
       {offline && (
-        <View style={[styles.panel, { borderColor: palette.bad, marginTop: 12 }]}>
-          <Text style={styles.text}>Offline — progress is saved on this device.</Text>
+        <Pressable
+          disabled={busy}
+          onPress={() => void bootstrap()}
+          style={[styles.panel, { borderColor: palette.bad, marginTop: 12 }]}
+        >
+          <Text style={styles.text}>
+            {busy ? 'Reconnecting…' : 'Offline — progress is saved on this device.'}
+          </Text>
           <Text style={styles.textDim}>
             {pending.length > 0
               ? `${pending.length} step batch${pending.length === 1 ? '' : 'es'} waiting to sync.`
-              : 'Steps will sync when the server is reachable.'}
+              : 'Tap to retry. A sleeping free-tier server can take a minute to wake.'}
           </Text>
-        </View>
+        </Pressable>
       )}
 
       {error && (
