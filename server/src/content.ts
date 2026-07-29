@@ -1,24 +1,62 @@
 // All starter-region content lives here. Treat this file as data, not logic -
 // the game engine in src/game/* should never hardcode IDs from this list.
 
-import type { Activity, ItemDef, Recipe, Skill } from './types';
+import type { Activity, ItemDef, Recipe, Region, Skill } from './types';
 
-// The starter region and its town.
+// The world.
 //
 // The proposal's MVP scope is "a single starting region with 3-4 activity
-// nodes and one town", and these name that framing so the interface matches
-// the world the proposal describes. Purely descriptive: no rule reads them,
-// and the quest list below is the region's node list.
-export const region = {
-  name: 'Disenchanted Forest',
-  blurb: 'Overgrown and picked over, but the wood and ore are still good.',
-};
+// nodes and one town" — that is the Disenchanted Forest, and it is the only
+// unlocked entry. The rest are declared so the world reads as a place with
+// edges rather than a single screen, and so the World tab renders from data.
+//
+// Locked regions are inert: no activity ids, and no rule anywhere reads this
+// list. Adding one is a content edit, not a code change.
+export const regions: Region[] = [
+  {
+    id: 'disenchanted_forest',
+    name: 'Disenchanted Forest',
+    blurb: 'Overgrown and picked over, but the wood and ore are still good.',
+    unlocked: true,
+    activityIds: ['chop_birch', 'chop_oak', 'mine_copper', 'mine_iron'],
+    town: {
+      name: 'Emberhollow',
+      location: 'The Forge',
+      blurb: 'A handful of houses around a chimney that has not gone out in years.',
+    },
+    skills: ['Woodcutting', 'Mining', 'Smithing'],
+  },
+  {
+    id: 'saltmarsh_reach',
+    name: 'Saltmarsh Reach',
+    blurb: 'Tidal flats east of the forest, drowned and drained twice a day.',
+    unlocked: false,
+    activityIds: [],
+    skills: ['Fishing', 'Cooking'],
+  },
+  {
+    id: 'cinderpeak',
+    name: 'Cinderpeak',
+    blurb: 'A volcanic ridge where the seams run deeper and the air runs hotter.',
+    unlocked: false,
+    activityIds: [],
+    skills: ['Deep Mining', 'Smelting'],
+  },
+  {
+    id: 'hollow_barrows',
+    name: 'Hollow Barrows',
+    blurb: 'Burial mounds under the north moor. Something still grows on them.',
+    unlocked: false,
+    activityIds: [],
+    skills: ['Herbalism', 'Alchemy'],
+  },
+];
 
-export const town = {
-  name: 'Emberhollow',
-  location: 'The Forge',
-  blurb: 'The region\'s only working forge. Smithing happens here, nowhere else.',
-};
+// The region the player is in. Screens that only ever show the current region
+// read these rather than indexing the list, but they are the same objects —
+// there is one source of truth.
+export const region = regions[0];
+export const town = regions[0].town!;
 
 export const skills: Skill[] = [
   { id: 'woodcutting', name: 'Woodcutting' },

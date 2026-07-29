@@ -37,6 +37,35 @@ export interface Activity {
   minLevel: number;    // skill level required
 }
 
+// A place in the world.
+//
+// The MVP ships one unlocked region; the rest are declared so the world has a
+// visible shape beyond its first area. Locked regions carry no activities and
+// nothing reads them except the World screen — they are a roadmap rendered
+// from data rather than a mockup drawn in a screen.
+export interface Region {
+  id: string;
+  name: string;
+  blurb: string;
+  unlocked: boolean;
+  /** Activity ids available here. Empty until a region is built. */
+  activityIds: string[];
+  /** The region's town, if it has one. */
+  town?: Town;
+  /**
+   * Skills the region deals in. Display names rather than SkillId, because a
+   * locked region names skills the game does not implement yet.
+   */
+  skills: string[];
+}
+
+export interface Town {
+  name: string;
+  /** The one place inside the town you can currently visit. */
+  location: string;
+  blurb: string;
+}
+
 // Crafting recipe (consumed at the forge / workshop).
 export interface Recipe {
   id: string;
