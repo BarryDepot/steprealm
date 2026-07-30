@@ -37,6 +37,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="world"
+        options={{
+          title: 'World',
+          headerTitle: 'The Realm',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="earth-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="inventory"
         options={{
           title: 'Inventory',
