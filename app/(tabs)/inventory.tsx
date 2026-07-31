@@ -26,12 +26,17 @@ function prettyName(id: string) {
  *
  * Reading it from the recipe list means adding a recipe updates this text on
  * its own, and a tool that stops being craftable cannot keep claiming it is.
+ * Every craftable tool can also drop, so the crafting route names the chest as
+ * a second chance rather than pretending it is the only way in.
  */
-function howToGet(itemId: string): string {
-  const recipe = recipes.find(r => r.output.item === itemId);
-  return recipe
-    ? `Craft at the forge · smithing Lv ${recipe.minLevel}`
-    : 'Rare drop from a treasure chest';
+function howToGet(def: ItemDef): string {
+  const recipe = recipes.find(r => r.output.item === def.id);
+  if (recipe) {
+    return `Craft at the forge · smithing Lv ${recipe.minLevel}, or find one in a chest`;
+  }
+  // A tool with no recipe and no advantage is starting kit, not a reward.
+  if ((def.tool?.efficiency ?? 0) === 0) return 'Starting equipment';
+  return 'Rare drop from a treasure chest';
 }
 
 const rarityColour = (rarity?: string) =>
@@ -118,7 +123,7 @@ export default function Inventory() {
                   {/* Only unowned tools need to explain themselves. */}
                   {!owned && (
                     <Text style={[styles.textDim, { marginTop: 4 }]}>
-                      {howToGet(def.id)}
+                      {howToGet(def)}
                     </Text>
                   )}
                 </Pressable>
