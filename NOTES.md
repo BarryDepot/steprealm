@@ -25,9 +25,14 @@ copy renders step targets and XP bars optimistically; `server/src/game/` is the
 real thing. Do not add rules to the client copy. `loot.ts` is server-only for
 exactly this reason: the client never rolls, so a second copy could only drift.
 
-Screens live under `app/(tabs)/`. Adding a destination means adding a
-`Tabs.Screen`, not a button on another screen — that is how Inventory and Forge
-previously ended up one edit away from being orphaned.
+Screens live under `app/(tabs)/` — Quests, World, Inventory, Forge. Adding a
+destination means adding a `Tabs.Screen`, not a button on another screen: that
+is how Inventory and Forge previously ended up one edit away from orphaned.
+
+The world is data. `regions` in the content files declares every region with an
+`unlocked` flag; only the first is unlocked and the rest carry no activities.
+No rule reads that list — it drives the World screen alone, so adding a region
+is a content edit.
 
 ## Constraints that have already caused bugs
 
@@ -62,7 +67,7 @@ also drives the activity screen's optimistic progress bar between flushes).
 ```
 # API — from server/
 npm start            # dev server on :3000
-npm test             # 76 tests (55 unit, 21 integration); needs .env + schema
+npm test             # 81 tests (60 unit, 21 integration); needs .env + schema
 npm run typecheck
 npm run db:setup     # DROPS and recreates all tables
 

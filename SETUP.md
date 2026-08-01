@@ -143,7 +143,7 @@ work while you were away. Worth recording for your demo video.
 
 ```
 cd server
-npm test          ... 76 tests: 55 unit on game rules, 21 integration
+npm test          ... 81 tests: 60 unit on game rules, 21 integration
 npm run typecheck
 ```
 

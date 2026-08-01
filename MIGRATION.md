@@ -238,6 +238,17 @@ reduction — together with a Steel Bar intermediate and three recipes following
 the same raw → bar → tool shape as the bronze chain. They use iron ore and oak
 from the existing region rather than introducing a new raw material.
 
+**The rare tier was made craftable.** Iron tools could previously only drop,
+which left a gap in the middle of the upgrade ladder — a player could craft
+bronze, then had nothing to work towards until steel — and left `iron_bar` an
+orphan: smelted by a recipe and consumed by none. `craft_iron_hatchet` and
+`craft_iron_pickaxe` close both gaps. Every tool above the starting kit is now
+craftable, and every resource is consumed by something; both properties are
+asserted by tests rather than left to inspection.
+
+The ladder now runs bronze (Lv 3/5) → iron (Lv 10/12) → steel (Lv 16/18), with
+each bar recipe unlocking before the tools that need it.
+
 ### Why this matters to the evaluation
 
 The proposal's reward structure was implemented but not reachable: a marker
@@ -266,7 +277,7 @@ returns an item of that rarity, and that the steel chain resolves end to end.
 | Proposed item | Status |
 | --- | --- |
 | Android platform support | Not delivered. See §1. |
-| Multiple regions and travel | Out of scope in the proposal; remains out of scope. |
+| Multiple regions and travel | Out of scope in the proposal; remains out of scope. The World screen declares three further regions as locked, clearly marked "Planned — future release". They carry no activities and grant nothing: they show the shape of the world beyond the MVP without claiming to implement it. |
 | Combat, friends, multiplayer | Out of scope in the proposal; remains out of scope. |
 | Original artwork | Not delivered. The interface is typographic, using a fixed palette. |
 

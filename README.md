@@ -115,7 +115,8 @@ Both devices must be on the same Wi-Fi. If you change `.env`, restart
 - Quest loop: each quest is a flat step target — walk it, then collect a fixed
   reward of resources and XP
 - Tools with work-efficiency multipliers that reduce a quest's step target
-- Crafting at the forge in Emberhollow — the only source of Smithing XP
+- Crafting at the forge in Emberhollow — the only source of Smithing XP, with
+  a full bronze → iron → steel tool ladder
 - Treasure-box loot rolls (~1 in 8 quests) across three rarity tiers, up to
   epic steel tools
 - **Real step input** from the device pedometer (iOS Core Motion)
@@ -129,7 +130,7 @@ Both devices must be on the same Wi-Fi. If you change `.env`, restart
 
 ```bash
 cd server
-npm test          # 76 tests: 55 unit on the game rules, 21 integration
+npm test          # 81 tests: 60 unit on the game rules, 21 integration
 npm run typecheck
 ```
 
@@ -146,8 +147,9 @@ existing rows alone.
 app/                    expo-router screens
   _layout.tsx           root stack + theming
   (tabs)/
-    _layout.tsx         the three permanent destinations
+    _layout.tsx         the four permanent destinations
     index.tsx           Quests — region, skills, quest list, sync status
+    world.tsx           the realm — regions, locked and unlocked
     inventory.tsx       resources + the full tool ladder, tap to equip
     forge.tsx           crafting, in the town of Emberhollow
   activity.tsx          live quest screen, pushed from Quests
