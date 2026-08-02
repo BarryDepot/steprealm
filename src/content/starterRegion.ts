@@ -109,33 +109,33 @@ export const items: ItemDef[] = [
 // than the rate of progression.
 export const activities: Activity[] = [
   { id: 'chop_birch',   name: 'Chop Birch Tree', skill: 'woodcutting',
-    targetSteps: 50,  yieldItem: 'birch_log',  yieldCount: 1, xpReward: 8,   minLevel: 1 },
+    targetSteps: 10,  yieldItem: 'birch_log',  yieldCount: 1, xpReward: 8,   minLevel: 1 },
   { id: 'chop_oak',     name: 'Chop Oak Tree',   skill: 'woodcutting',
-    targetSteps: 150, yieldItem: 'oak_log',    yieldCount: 4, xpReward: 70,  minLevel: 5 },
+    targetSteps: 30,  yieldItem: 'oak_log',    yieldCount: 4, xpReward: 70,  minLevel: 5 },
   { id: 'mine_copper',  name: 'Mine Copper Vein', skill: 'mining',
-    targetSteps: 60,  yieldItem: 'copper_ore', yieldCount: 2, xpReward: 20,  minLevel: 1 },
+    targetSteps: 12,  yieldItem: 'copper_ore', yieldCount: 2, xpReward: 20,  minLevel: 1 },
   { id: 'mine_iron',    name: 'Mine Iron Vein',   skill: 'mining',
-    targetSteps: 250, yieldItem: 'iron_ore',   yieldCount: 5, xpReward: 110, minLevel: 8 },
+    targetSteps: 50,  yieldItem: 'iron_ore',   yieldCount: 5, xpReward: 110, minLevel: 8 },
 ];
 
 export const recipes: Recipe[] = [
   { id: 'smelt_bronze', name: 'Smelt Bronze Bar', skill: 'smithing',
     inputs: [{ item: 'copper_ore', count: 2 }],
     output: { item: 'bronze_bar', count: 1 },
-    xpReward: 12, minLevel: 1, stepCost: 20 },
+    xpReward: 12, minLevel: 1, stepCost: 4 },
   { id: 'smelt_iron',   name: 'Smelt Iron Bar', skill: 'smithing',
     inputs: [{ item: 'iron_ore', count: 1 }],
     output: { item: 'iron_bar', count: 1 },
-    xpReward: 22, minLevel: 8, stepCost: 35 },
+    xpReward: 22, minLevel: 8, stepCost: 7 },
 
   { id: 'craft_bronze_hatchet', name: 'Bronze Hatchet', skill: 'smithing',
     inputs: [{ item: 'bronze_bar', count: 1 }, { item: 'birch_log', count: 1 }],
     output: { item: 'bronze_hatchet', count: 1 },
-    xpReward: 30, minLevel: 3, stepCost: 50 },
+    xpReward: 30, minLevel: 3, stepCost: 10 },
   { id: 'craft_bronze_pickaxe', name: 'Bronze Pickaxe', skill: 'smithing',
     inputs: [{ item: 'bronze_bar', count: 2 }, { item: 'birch_log', count: 1 }],
     output: { item: 'bronze_pickaxe', count: 1 },
-    xpReward: 45, minLevel: 5, stepCost: 75 },
+    xpReward: 45, minLevel: 5, stepCost: 15 },
 
   // Rare tier. These were previously loot-only, which left a hole in the middle
   // of the ladder — a player could craft bronze, then nothing until steel — and
@@ -143,11 +143,11 @@ export const recipes: Recipe[] = [
   { id: 'craft_iron_hatchet', name: 'Iron Hatchet', skill: 'smithing',
     inputs: [{ item: 'iron_bar', count: 2 }, { item: 'oak_log', count: 1 }],
     output: { item: 'iron_hatchet', count: 1 },
-    xpReward: 55, minLevel: 10, stepCost: 90 },
+    xpReward: 55, minLevel: 10, stepCost: 18 },
   { id: 'craft_iron_pickaxe', name: 'Iron Pickaxe', skill: 'smithing',
     inputs: [{ item: 'iron_bar', count: 3 }, { item: 'oak_log', count: 1 }],
     output: { item: 'iron_pickaxe', count: 1 },
-    xpReward: 65, minLevel: 12, stepCost: 110 },
+    xpReward: 65, minLevel: 12, stepCost: 22 },
 
   // Epic tier. Same raw → bar → tool shape as bronze: iron ore and oak smelt
   // into a steel bar, which forges into the epic tools. The oak stands in for
@@ -156,16 +156,16 @@ export const recipes: Recipe[] = [
   { id: 'smelt_steel', name: 'Smelt Steel Bar', skill: 'smithing',
     inputs: [{ item: 'iron_ore', count: 3 }, { item: 'oak_log', count: 2 }],
     output: { item: 'steel_bar', count: 1 },
-    xpReward: 40, minLevel: 14, stepCost: 60 },
+    xpReward: 40, minLevel: 14, stepCost: 12 },
 
   { id: 'craft_steel_hatchet', name: 'Steel Hatchet', skill: 'smithing',
     inputs: [{ item: 'steel_bar', count: 2 }, { item: 'oak_log', count: 1 }],
     output: { item: 'steel_hatchet', count: 1 },
-    xpReward: 70, minLevel: 16, stepCost: 120 },
+    xpReward: 70, minLevel: 16, stepCost: 24 },
   { id: 'craft_steel_pickaxe', name: 'Steel Pickaxe', skill: 'smithing',
     inputs: [{ item: 'steel_bar', count: 3 }, { item: 'oak_log', count: 1 }],
     output: { item: 'steel_pickaxe', count: 1 },
-    xpReward: 90, minLevel: 18, stepCost: 160 },
+    xpReward: 90, minLevel: 18, stepCost: 32 },
 ];
 
 // Helpers so screens don't have to know about array internals.

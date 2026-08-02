@@ -107,8 +107,8 @@ describe('step target and tools', () => {
 
   test('a bronze hatchet reduces the target by 15 per cent', () => {
     const player = newPlayer({ equipped: { woodcutting: 'bronze_hatchet' } });
-    const act = activityById('chop_birch')!; // 50 steps base
-    assert.equal(effectiveTargetSteps(act, player), 43); // round(50 * 0.85)
+    const act = activityById('chop_birch')!; // 10 steps base
+    assert.equal(effectiveTargetSteps(act, player), 9); // round(10 * 0.85)
   });
 
   test('a tool never reduces the target below one step', () => {
@@ -125,28 +125,28 @@ describe('step target and tools', () => {
 });
 
 describe('quest progress', () => {
-  // chop_birch is a 50-step quest with the starter hatchet equipped.
+  // chop_birch is a 10-step quest with the starter hatchet equipped.
   test('steps short of the target leave the quest unfinished', () => {
     const player = newPlayer({ current: quest('chop_birch') });
-    const tick = computeTick(player, 10)!;
-    assert.equal(tick.stepsTowardsTarget, 10);
-    assert.equal(tick.targetSteps, 50);
+    const tick = computeTick(player, 4)!;
+    assert.equal(tick.stepsTowardsTarget, 4);
+    assert.equal(tick.targetSteps, 10);
     assert.equal(tick.complete, false);
   });
 
   test('progress accumulates across separate batches', () => {
     let player = newPlayer({ current: quest('chop_birch') });
-    player = ingestSteps(player, 30).player;
-    assert.equal(player.current!.totalSteps, 30);
+    player = ingestSteps(player, 6).player;
+    assert.equal(player.current!.totalSteps, 6);
 
-    const result = ingestSteps(player, 20); // 50 total — exactly the target
-    assert.equal(result.player.current!.totalSteps, 50);
+    const result = ingestSteps(player, 4); // 10 total — exactly the target
+    assert.equal(result.player.current!.totalSteps, 10);
     assert.equal(result.questsCompleted, 1);
   });
 
   test('reaching the target finishes the quest', () => {
     const player = newPlayer({ current: quest('chop_birch') });
-    const result = ingestSteps(player, 50);
+    const result = ingestSteps(player, 10);
     assert.equal(result.questsCompleted, 1);
     assert.equal(computeTick(result.player, 0)!.complete, true);
   });
@@ -166,8 +166,8 @@ describe('quest progress', () => {
       equipped: { woodcutting: 'bronze_hatchet' },
       current: quest('chop_birch'),
     });
-    // 43 steps rather than 50 with the 15 per cent bronze discount.
-    const result = ingestSteps(player, 43);
+    // 9 steps rather than 10 with the 15 per cent bronze discount.
+    const result = ingestSteps(player, 9);
     assert.equal(result.questsCompleted, 1);
   });
 
@@ -181,7 +181,7 @@ describe('quest progress', () => {
 
   test('a finished quest keeps banking steps without completing again', () => {
     const done = newPlayer({
-      current: quest('chop_birch', { totalSteps: 50, stepsBanked: 50 }),
+      current: quest('chop_birch', { totalSteps: 10, stepsBanked: 50 }),
     });
     const result = ingestSteps(done, 100);
 
@@ -191,7 +191,7 @@ describe('quest progress', () => {
 
   test('reaching the target announces completion exactly once', () => {
     const player = newPlayer({ current: quest('chop_birch') });
-    const finished = ingestSteps(player, 50);
+    const finished = ingestSteps(player, 10);
     assert.equal(finished.events.filter(e => e.kind === 'system').length, 1);
 
     // A later sync against an uncollected quest must not re-announce it.
@@ -222,7 +222,7 @@ describe('quest progress', () => {
 describe('collecting a quest', () => {
   // chop_birch: walk 50 steps for 1 birch log and 8 xp.
   const finished = () => newPlayer({
-    current: quest('chop_birch', { totalSteps: 50, stepsBanked: 50 }),
+    current: quest('chop_birch', { totalSteps: 10, stepsBanked: 50 }),
   });
 
   test('collecting grants the quest yield', () => {
@@ -242,7 +242,7 @@ describe('collecting a quest', () => {
 
   test('an unfinished quest cannot be collected', () => {
     const player = newPlayer({
-      current: quest('chop_birch', { totalSteps: 49 }),
+      current: quest('chop_birch', { totalSteps: 9 }),
     });
     assert.throws(() => claimQuest(player),
       (err: unknown) => err instanceof GameRuleError);
@@ -250,19 +250,19 @@ describe('collecting a quest', () => {
 
   test('an unfinished quest is left untouched by a refused collection', () => {
     const player = newPlayer({
-      current: quest('chop_birch', { totalSteps: 49 }),
+      current: quest('chop_birch', { totalSteps: 9 }),
     });
     assert.throws(() => claimQuest(player));
-    assert.equal(player.current!.totalSteps, 49);
+    assert.equal(player.current!.totalSteps, 9);
     assert.equal(countOf(player, 'birch_log'), 0);
   });
 
   test('a tool discount lets a quest be collected earlier', () => {
     const player = newPlayer({
       equipped: { woodcutting: 'bronze_hatchet' },
-      current: quest('chop_birch', { totalSteps: 43 }),
+      current: quest('chop_birch', { totalSteps: 9 }),
     });
-    // 43 steps is short of the 50-step base but meets the discounted target.
+    // 9 steps is short of the 10-step base but meets the discounted target.
     const result = withoutLoot(() => claimQuest(player));
     assert.equal(countOf(result.player, 'birch_log'), 1);
   });
@@ -292,7 +292,7 @@ describe('collecting a quest', () => {
         mining: { xp: 0, level: 1 },
         smithing: { xp: 0, level: 1 },
       },
-      current: quest('mine_copper', { totalSteps: 60 }),
+      current: quest('mine_copper', { totalSteps: 12 }),
     });
     const result = withoutLoot(() => claimQuest(player));
     assert.equal(countOf(result.player, 'copper_ore'), 2);
@@ -307,7 +307,7 @@ describe('collecting a quest', () => {
         mining: { xp: 0, level: 1 },
         smithing: { xp: 0, level: 1 },
       },
-      current: quest('chop_birch', { totalSteps: 50 }),
+      current: quest('chop_birch', { totalSteps: 10 }),
     });
 
     const result = withoutLoot(() => claimQuest(player));
@@ -387,8 +387,8 @@ describe('crafting', () => {
   });
 
   test('crafting deducts its step cost from the banked pool', () => {
-    const result = craft(crafter(), 'smelt_bronze'); // costs 20 steps
-    assert.equal(result.player.current!.stepsBanked, 480);
+    const result = craft(crafter(), 'smelt_bronze'); // costs 4 steps
+    assert.equal(result.player.current!.stepsBanked, 496);
   });
 
   test('crafting without the inputs is refused', () => {
@@ -403,7 +403,7 @@ describe('crafting', () => {
   test('crafting without enough banked steps is refused', () => {
     const player = newPlayer({
       inventory: [{ item: 'copper_ore', count: 4 }],
-      current: quest('mine_copper', { stepsBanked: 5 }),
+      current: quest('mine_copper', { stepsBanked: 2 }),
     });
     assert.throws(() => craft(player, 'smelt_bronze'),
       (err: unknown) => err instanceof GameRuleError);
@@ -545,8 +545,8 @@ describe('crafting', () => {
       }
 
       const player = newPlayer({ equipped: { woodcutting: 'steel_hatchet' } });
-      const act = activityById('chop_birch')!; // 50 steps base
-      assert.equal(effectiveTargetSteps(act, player), 28); // round(50 * 0.55)
+      const act = activityById('chop_birch')!; // 10 steps base
+      assert.equal(effectiveTargetSteps(act, player), 6); // round(10 * 0.55)
     });
 
     test('the steel chain is gated above the bronze chain', () => {

@@ -98,7 +98,7 @@ describe('the full step-to-reward round trip', () => {
 
     await api('POST', `/api/players/${id}/activity`, { activityId: 'chop_birch' });
 
-    // 260 steps clears the 50-step target several times over; the surplus
+    // 260 steps clears the 10-step target many times over; the surplus
     // stays in the crafting pool rather than earning anything extra.
     const walked = await api('POST', `/api/players/${id}/steps`, {
       steps: 260,
@@ -127,7 +127,7 @@ describe('the full step-to-reward round trip', () => {
   test('collecting a finished quest grants its rewards and persists them', async () => {
     const id = await newPlayer();
     await api('POST', `/api/players/${id}/activity`, { activityId: 'chop_birch' });
-    await api('POST', `/api/players/${id}/steps`, { steps: 50 }); // the target
+    await api('POST', `/api/players/${id}/steps`, { steps: 10 }); // the target
 
     const claimed = await api('POST', `/api/players/${id}/activity/claim`);
     assert.equal(claimed.status, 200);
@@ -144,14 +144,14 @@ describe('the full step-to-reward round trip', () => {
   test('an unfinished quest cannot be collected', async () => {
     const id = await newPlayer();
     await api('POST', `/api/players/${id}/activity`, { activityId: 'chop_birch' });
-    await api('POST', `/api/players/${id}/steps`, { steps: 30 }); // 30 of 50
+    await api('POST', `/api/players/${id}/steps`, { steps: 6 }); // 6 of 10
 
     const res = await api('POST', `/api/players/${id}/activity/claim`);
     assert.equal(res.status, 422);
 
     // The refusal changed nothing.
     const after = await api('GET', `/api/players/${id}`);
-    assert.equal(after.body.player.current.totalSteps, 30);
+    assert.equal(after.body.player.current.totalSteps, 6);
     assert.equal(countOf(after.body.player, 'birch_log'), 0);
   });
 
@@ -165,16 +165,16 @@ describe('the full step-to-reward round trip', () => {
     const id = await newPlayer();
     await api('POST', `/api/players/${id}/activity`, { activityId: 'chop_birch' });
 
-    await api('POST', `/api/players/${id}/steps`, { steps: 30 });
+    await api('POST', `/api/players/${id}/steps`, { steps: 6 });
     const first = await api('GET', `/api/players/${id}`);
-    assert.equal(first.body.player.current.totalSteps, 30);
+    assert.equal(first.body.player.current.totalSteps, 6);
 
     // Short of the target, so collecting is still refused.
     assert.equal((await api('POST', `/api/players/${id}/activity/claim`)).status, 422);
 
-    await api('POST', `/api/players/${id}/steps`, { steps: 20 });
+    await api('POST', `/api/players/${id}/steps`, { steps: 4 });
     const second = await api('GET', `/api/players/${id}`);
-    assert.equal(second.body.player.current.totalSteps, 50);
+    assert.equal(second.body.player.current.totalSteps, 10);
     assert.equal((await api('POST', `/api/players/${id}/activity/claim`)).status, 200);
   });
 
@@ -195,15 +195,15 @@ describe('the full step-to-reward round trip', () => {
   test('every sync is written to the step ledger', async () => {
     const id = await newPlayer();
     await api('POST', `/api/players/${id}/activity`, { activityId: 'mine_copper' });
-    await api('POST', `/api/players/${id}/steps`, { steps: 30 }); // 30 of 60
-    await api('POST', `/api/players/${id}/steps`, { steps: 30 }); // finishes it
+    await api('POST', `/api/players/${id}/steps`, { steps: 5 });  // 5 of 12
+    await api('POST', `/api/players/${id}/steps`, { steps: 10 }); // finishes it
 
     const { rows } = await pool.query(
       `SELECT steps, actions, source FROM step_ledger
        WHERE player_id = $1 ORDER BY id`, [id]);
 
     assert.equal(rows.length, 2);
-    assert.equal(rows[0].steps, 30);
+    assert.equal(rows[0].steps, 5);
     // The ledger's actions column now counts quests finished by the batch.
     assert.equal(rows[0].actions, 0);
     assert.equal(rows[1].actions, 1);
@@ -253,7 +253,7 @@ describe('crafting over HTTP', () => {
 
     // Ore now only arrives by collecting a finished quest.
     await api('POST', `/api/players/${id}/activity`, { activityId: 'mine_copper' });
-    await api('POST', `/api/players/${id}/steps`, { steps: 60 }); // the target
+    await api('POST', `/api/players/${id}/steps`, { steps: 12 }); // the target
     const claimed = await api('POST', `/api/players/${id}/activity/claim`);
     assert.equal(countOf(claimed.body.player, 'copper_ore'), 2);
 
@@ -310,8 +310,8 @@ describe('equipment over HTTP', () => {
     assert.equal(equipped.body.player.equipped.woodcutting, 'bronze_hatchet');
 
     await api('POST', `/api/players/${id}/activity`, { activityId: 'chop_birch' });
-    // The 50-step target drops to 43, so 43 steps finishes the quest.
-    await api('POST', `/api/players/${id}/steps`, { steps: 43 });
+    // The 10-step target drops to 9, so 9 steps finishes the quest.
+    await api('POST', `/api/players/${id}/steps`, { steps: 9 });
     const claimed = await api('POST', `/api/players/${id}/activity/claim`);
     assert.equal(claimed.status, 200);
     assert.equal(countOf(claimed.body.player, 'birch_log'), 1);
