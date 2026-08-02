@@ -131,11 +131,11 @@ export const recipes: Recipe[] = [
   { id: 'craft_bronze_hatchet', name: 'Bronze Hatchet', skill: 'smithing',
     inputs: [{ item: 'bronze_bar', count: 1 }, { item: 'birch_log', count: 1 }],
     output: { item: 'bronze_hatchet', count: 1 },
-    xpReward: 30, minLevel: 3, stepCost: 10 },
+    xpReward: 30, minLevel: 1, stepCost: 10 },
   { id: 'craft_bronze_pickaxe', name: 'Bronze Pickaxe', skill: 'smithing',
     inputs: [{ item: 'bronze_bar', count: 2 }, { item: 'birch_log', count: 1 }],
     output: { item: 'bronze_pickaxe', count: 1 },
-    xpReward: 45, minLevel: 5, stepCost: 15 },
+    xpReward: 45, minLevel: 1, stepCost: 15 },
 
   // Rare tier. These were previously loot-only, which left a hole in the middle
   // of the ladder — a player could craft bronze, then nothing until steel — and
